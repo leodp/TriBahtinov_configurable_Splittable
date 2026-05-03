@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<!-- TroBahtinov_configurable_Splittable - Release v1.0 | License: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tri Bahtinov Mask, splittable, configurable</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+#svg-panel {
+    flex: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #D0D0D0;
+    padding: 20px;
+    min-width: 0;
+}
+#svg-panel svg {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+}
+#controls-panel {
+    flex: 2;
+    overflow-y: auto;
+    padding: 20px;
+    background: #f5f5f5;
+    border-left: 1px solid #ccc;
+}
+#controls-panel h2 {
+    margin-bottom: 8px;
+    font-size: 18px;
+}
+#controls-panel p.desc {
+    font-size: 12px;
+    margin-bottom: 16px;
+    color: #555;
+}
+.param-group {
+    margin-bottom: 12px;
+}
+.param-group label {
+    display: inline-block;
+    width: 200px;
+    font-size: 13px;
+}
+.param-group input[type="text"],
+.param-group input[type="number"] {
+    width: 80px;
+    padding: 2px 4px;
+}
+.param-group select {
+    padding: 2px 4px;
+}
+.param-group input[type="checkbox"] {
+    margin-left: 4px;
+}
+.section-title {
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    padding-top: 10px;
+    border-top: 2px solid #000;
+}
+.section-title:first-of-type {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+}
+.buttons {
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+.buttons button {
+    padding: 6px 14px;
+    margin-right: 8px;
+    cursor: pointer;
+}
+#svg-source-title {
+    font-weight: bold;
+    margin-top: 16px;
+    margin-bottom: 4px;
+}
+#svgSrc {
+    width: 100%;
+    height: 200px;
+    font-family: monospace;
+    font-size: 11px;
+    resize: vertical;
+}
+</style>
+</head>
+<body>
+
+<!-- LEFT: SVG drawing area -->
+<div id="svg-panel">
+    <svg id="maskSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<!-- RIGHT: Controls -->
+<div id="controls-panel">
+    <h2>Tri Bahtinov Mask, splittable, configurable</h2>
+    <p class="desc">Tri-Bahtinov mask generator, based on Satakagi implementation. The mask can be split, to allow bigger masks to be 3D printed. Slits can be rotated of an offset angle. Programmed by Leonardo Della Pietra leodp@yahoo.com</p>
+
+    <div class="section-title">Telescope parameters &amp; units</div>
+
+    <div class="param-group">
+        <label for="units">Units:</label>
+        <select id="units">
+            <option value="mm" selected>mm</option>
+            <option value="inches">Inches</option>
+        </select>
+    </div>
+    <div class="param-group">
+        <label for="focalLength">Focal length:</label>
+        <input type="text" id="focalLength" value="1500">
+    </div>
+    <div class="param-group">
+        <label for="lensDiam">Lens diameter:</label>
+        <input type="text" id="lensDiam" value="205">
+    </div>
+    <div class="param-group">
+        <label for="tubeDiam">Tube/mask diameter:</label>
+        <input type="text" id="tubeDiam" value="220">
+    </div>
+    <div class="param-group">
+        <label for="centralHole">Central hole diam:</label>
+        <input type="text" id="centralHole" value="30">
+    </div>
+
+    <div class="section-title">Slits &amp; Bahtinov parameters</div>
+
+    <div class="param-group">
+        <label for="slitStemRatio">Slit/Stem ratio:</label>
+        <select id="slitStemRatio">
+            <option value="10">10</option>
+            <option value="7">7</option>
+            <option value="5">5</option>
+            <option value="4">4</option>
+            <option value="3">3</option>
+            <option value="2">2</option>
+            <option value="1.5" selected>1.5</option>
+            <option value="1">1</option>
+            <option value="0.7">0.7</option>
+            <option value="0.5">0.5</option>
+            <option value="0.3">0.3</option>
+            <option value="0.25">0.25</option>
+            <option value="0.2">0.2</option>
+        </select>
+    </div>
+    <div class="param-group">
+        <label for="slitsRatio">Slits rings ratio:</label>
+        <input type="text" id="slitsRatio" value="1">
+    </div>
+    <div class="param-group">
+        <label for="bahtinovFactor">Bahtinov factor:</label>
+        <input type="text" id="bahtinovFactor" value="150">
+    </div>
+    <div class="param-group">
+        <label for="thirdOrder">Use 3rd order spectrum:</label>
+        <input type="checkbox" id="thirdOrder">
+    </div>
+    <div class="param-group">
+        <label for="bahtinovAngle">Bahtinov angles (°):</label>
+        <input type="text" id="bahtinovAngle" value="10">
+    </div>
+    <div class="param-group">
+        <label for="offsetAngle">Offset angle (°):</label>
+        <input type="text" id="offsetAngle" value="0">
+    </div>
+    <div class="param-group">
+        <label for="ringBorder">Rings borders:</label>
+        <input type="text" id="ringBorder" value="5">
+    </div>
+    <div class="param-group">
+        <label for="sectorBorder">Sectors borders:</label>
+        <input type="text" id="sectorBorder" value="6">
+    </div>
+    <div class="param-group">
+        <label for="rounding">Rounding (slit width ratio):</label>
+        <select id="rounding">
+            <option value="0" selected>No</option>
+            <option value="0.5">0.5</option>
+            <option value="0.3">0.3</option>
+            <option value="0.2">0.2</option>
+            <option value="0.15">0.15</option>
+            <option value="0.1">0.1</option>
+            <option value="0.05">0.05</option>
+        </select>
+    </div>
+
+    <div class="section-title">Modifications &amp; export</div>
+
+    <div class="param-group">
+        <label for="splitMask">Split mask:</label>
+        <input type="checkbox" id="splitMask">
+    </div>
+    <div class="param-group">
+        <label for="mountingHoles">With Mounting holes?</label>
+        <input type="checkbox" id="mountingHoles">
+    </div>
+    <div class="param-group">
+        <label for="mountingHoleSize">Mounting holes size:</label>
+        <input type="text" id="mountingHoleSize" value="2.5">
+    </div>
+    <div class="param-group">
+        <label for="mountingHolePos">Mounting holes position:</label>
+        <input type="text" id="mountingHolePos" value="">
+    </div>
+    <div class="param-group">
+        <label for="thickness3D">3D thickness:</label>
+        <input type="text" id="thickness3D" value="3">
+    </div>
+
+    <div class="buttons">
+        <button id="btnDownloadSVG">Download SVG</button>
+        <button id="btnDownload3D">Download 3D (bridge merge)</button>
+        <button id="btnDownload3DScanline">Download 3D (scanline)</button>
+    </div>
+
+    <div id="svg-source-title">SVG source</div>
+    <textarea id="svgSrc" readonly></textarea>
+</div>
+
+<script>
+// ============================================================
+// MASK PARAMETERS (defaults in mm, angles in degrees)
+// ============================================================
+var params = {
+    FL: 1500,           // Focal length (mm)
+    TDiam: 220,         // Tube/mask diameter (mm)
+    Diam: 205,          // Lens/objective diameter (mm)
+    Rh: 15,             // Central hole radius (mm)
+    Rth: 5,             // Solid ring width (mm)
+    SectorsStem_th: 6,  // Sector stem width (mm)
+    BahF: 150,          // Bahtinov factor
+    As: 10,             // Bahtinov tilt angle (degrees)
+    A_off: 0,           // Slits offset tilt (degrees)
+    OF: 1,              // Order factor (1 or 3)
+    Sd_Sst_rat: 1.5,   // Slit/Stem ratio
+    SlitsRatio: 1,      // Slits rings ratio: slits_w4 = slits_w2 / SlitsRatio
+    Rounding: 0,        // Rounding factor (0 = none)
+    Split: false,       // Split mask for 3D printing
+    Thickness3D: 3,     // 3D model thickness (mm)
+    RHole: 2.5,         // Mounting hole radius (mm)
+    WithMountingHoles: false,  // Enable mounting holes
+    MHolesPos: 0          // Mounting holes radial position (0 = auto center of R5)
+};
+
+// Derived values (calculated in updateDerived)
+var derived = {
+    slits_step: 0,
+    slits_d: 0,
+    slits_w: 0,
+    slits_w2: 0,
+    slits_w4: 0
+};
+
+// ============================================================
+// CALCULATION ENGINE
+// ============================================================
+function updateDerived() {
+    var p = params;
+    p.slits_step = p.OF * p.FL / p.BahF;
+
+    // slits_w = (Diam/2 - Rth - Rth - Rh) / 2
+    p.slits_w = (p.Diam / 2 - p.Rth - p.Rth - p.Rh) / 2;
+    if (p.slits_w <= 0) {
+        p.Rth = p.Rth / 2;
+        p.slits_w = (p.Diam / 2 - p.Rth - p.Rth - p.Rh) / 2;
+    }
+
+    // Split slits_w into slits_w2 and slits_w4 using SlitsRatio
+    // (slits_w2 + slits_w4)/2 = slits_w  and  slits_w4 = slits_w2 / SlitsRatio
+    // => slits_w2 + slits_w2/SlitsRatio = 2*slits_w
+    // => slits_w2 = 2*slits_w / (1 + 1/SlitsRatio)
+    p.slits_w2 = 2 * p.slits_w / (1 + 1 / p.SlitsRatio);
+    p.slits_w4 = p.slits_w2 / p.SlitsRatio;
+
+    // slits_d = slits_step / (1 + Sd_Sst_rat)
+    p.slits_d = p.slits_step / (1 + p.Sd_Sst_rat);
+    // Validation: if slits_d >= slits_step, bump ratio
+    if (p.slits_d >= p.slits_step) {
+        // Move to next larger ratio value
+        var ratios = [10, 7, 5, 4, 3, 2, 1.5, 1, 0.7, 0.5, 0.3, 0.25, 0.2];
+        var idx = ratios.indexOf(p.Sd_Sst_rat);
+        if (idx > 0) {
+            p.Sd_Sst_rat = ratios[idx - 1];
+            p.slits_d = p.slits_step / (1 + p.Sd_Sst_rat);
+        }
+    }
+
+    derived.slits_step = p.slits_step;
+    derived.slits_d = p.slits_d;
+    derived.slits_w = p.slits_w;
+    derived.slits_w2 = p.slits_w2;
+    derived.slits_w4 = p.slits_w4;
+}
+
+// ============================================================
+// MATH HELPERS
+// ============================================================
+function deg2rad(d) { return d * Math.PI / 180; }
+function rad2deg(r) { return r * 180 / Math.PI; }
+
+// Adjust color luminosity by shifting HSL lightness by delta (±0.0 to 1.0)
+// hex: '#RRGGBB', delta: e.g. +0.2 or -0.2
+function adjustColorLuminosity(hex, delta) {
+    var r = parseInt(hex.slice(1, 3), 16) / 255;
+    var g = parseInt(hex.slice(3, 5), 16) / 255;
+    var b = parseInt(hex.slice(5, 7), 16) / 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var h, s, l = (max + min) / 2;
+    if (max === min) { h = s = 0; }
+    else {
+        var d2 = max - min;
+        s = l > 0.5 ? d2 / (2 - max - min) : d2 / (max + min);
+        if (max === r) h = ((g - b) / d2 + (g < b ? 6 : 0)) / 6;
+        else if (max === g) h = ((b - r) / d2 + 2) / 6;
+        else h = ((r - g) / d2 + 4) / 6;
+    }
+    l = Math.max(0, Math.min(1, l + delta));
+    // HSL to RGB
+    var r2, g2, b2;
+    if (s === 0) { r2 = g2 = b2 = l; }
+    else {
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p2 = 2 * l - q;
+        r2 = hue2rgb(p2, q, h + 1/3);
+        g2 = hue2rgb(p2, q, h);
+        b2 = hue2rgb(p2, q, h - 1/3);
+    }
+    return '#' + toHex2(Math.round(r2 * 255)) + toHex2(Math.round(g2 * 255)) + toHex2(Math.round(b2 * 255));
+}
+function hue2rgb(p, q, t) {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+}
+function toHex2(v) { var h = v.toString(16); return h.length < 2 ? '0' + h : h; }
+
+// ============================================================
+// SLIT ROUNDING
+// Apply rounding to all vertices of a polygon.
+// Returns a new polygon with arc segments approximated at each corner.
+// roundingRadius: the fillet radius
+// arcSegments: number of line segments per rounded corner arc
+// ============================================================
+function applyRounding(poly, roundingRadius, arcSegments) {
+    if (roundingRadius <= 0 || !poly || poly.length < 3) return poly;
+    arcSegments = arcSegments || 12;
+
+    var n = poly.length;
+    var COLLINEAR_THRESHOLD = 5 * Math.PI / 180; // 5° — vertices with less turn are "arc" vertices (lowered to catch stem/curve intersections)
+
+    // Compute turning angle at each vertex
+    function turningAngle(i) {
+        var prev = poly[(i + n - 1) % n];
+        var curr = poly[i];
+        var next = poly[(i + 1) % n];
+        var d1x = prev[0] - curr[0], d1y = prev[1] - curr[1];
+        var d2x = next[0] - curr[0], d2y = next[1] - curr[1];
+        var len1 = Math.sqrt(d1x * d1x + d1y * d1y);
+        var len2 = Math.sqrt(d2x * d2x + d2y * d2y);
+        if (len1 < 1e-9 || len2 < 1e-9) return 0;
+        var dot = (d1x * d2x + d1y * d2y) / (len1 * len2);
+        dot = Math.max(-1, Math.min(1, dot));
+        return Math.PI - Math.acos(dot);
+    }
+
+    // Mark significant vertices
+    var isSignificant = [];
+    for (var i = 0; i < n; i++) {
+        isSignificant.push(Math.abs(turningAngle(i)) > COLLINEAR_THRESHOLD);
+    }
+
+    // Edge length between consecutive vertices
+    function edgeLen(i) {
+        var j = (i + 1) % n;
+        var dx = poly[j][0] - poly[i][0], dy = poly[j][1] - poly[i][1];
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Accumulated length from vertex i backward to previous significant vertex
+    function accumLenBack(i) {
+        var total = 0, idx = i;
+        for (var steps = 0; steps < n; steps++) {
+            var prevIdx = (idx + n - 1) % n;
+            total += edgeLen(prevIdx);
+            if (isSignificant[prevIdx] && prevIdx !== i) break;
+            idx = prevIdx;
+        }
+        return total;
+    }
+
+    // Accumulated length from vertex i forward to next significant vertex
+    function accumLenFwd(i) {
+        var total = 0, idx = i;
+        for (var steps = 0; steps < n; steps++) {
+            var nextIdx = (idx + 1) % n;
+            total += edgeLen(idx);
+            if (isSignificant[nextIdx] && nextIdx !== i) break;
+            idx = nextIdx;
+        }
+        return total;
+    }
+
+    // --- PASS 1: Compute tangentDist for each significant vertex ---
+    var tangentDists = new Array(n);
+    for (var i = 0; i < n; i++) {
+        tangentDists[i] = 0;
+        if (!isSignificant[i]) continue;
+
+        var prev = poly[(i + n - 1) % n];
+        var curr = poly[i];
+        var next = poly[(i + 1) % n];
+        var d1x = prev[0] - curr[0], d1y = prev[1] - curr[1];
+        var d2x = next[0] - curr[0], d2y = next[1] - curr[1];
+        var len1 = Math.sqrt(d1x * d1x + d1y * d1y);
+        var len2 = Math.sqrt(d2x * d2x + d2y * d2y);
+        if (len1 < 1e-9 || len2 < 1e-9) continue;
+
+        var u1x = d1x / len1, u1y = d1y / len1;
+        var u2x = d2x / len2, u2y = d2y / len2;
+        var dot = u1x * u2x + u1y * u2y;
+        dot = Math.max(-1, Math.min(1, dot));
+        var angle = Math.acos(dot);
+        var halfAngle = angle / 2;
+        if (Math.abs(Math.sin(halfAngle)) < 1e-9) continue;
+
+        var tangentDist = roundingRadius / Math.tan(halfAngle);
+        var availBack = accumLenBack(i);
+        var availFwd = accumLenFwd(i);
+        // Allow fillet to consume up to 99% of each side
+        var maxDistBack = availBack * 0.99;
+        var maxDistFwd = availFwd * 0.99;
+        var maxDist = Math.min(maxDistBack, maxDistFwd);
+        if (tangentDist > maxDist) {
+            // Reduce fillet: move center inward so arc remains tangent
+            // to both edges. Recalculate effectiveR from the clamped tangentDist.
+            tangentDist = maxDist;
+        }
+        tangentDists[i] = tangentDist;
+    }
+
+    // --- PASS 2: For each non-significant vertex, check if it's consumed by a neighbor's fillet ---
+    // A non-significant vertex at index j is "consumed" if it falls within tangentDist
+    // of a significant vertex walking along the polygon edges.
+    var consumed = new Array(n);
+    for (var i = 0; i < n; i++) consumed[i] = false;
+
+    for (var i = 0; i < n; i++) {
+        if (!isSignificant[i] || tangentDists[i] <= 0) continue;
+        var td = tangentDists[i];
+
+        // Walk backward and mark consumed vertices
+        var dist = 0;
+        var idx = i;
+        for (var steps = 0; steps < n; steps++) {
+            var prevIdx = (idx + n - 1) % n;
+            dist += edgeLen(prevIdx);
+            if (isSignificant[prevIdx]) break;
+            if (dist <= td) consumed[prevIdx] = true;
+            else break;
+            idx = prevIdx;
+        }
+
+        // Walk forward and mark consumed vertices
+        dist = 0;
+        idx = i;
+        for (var steps = 0; steps < n; steps++) {
+            var nextIdx = (idx + 1) % n;
+            dist += edgeLen(idx);
+            if (isSignificant[nextIdx]) break;
+            if (dist <= td) consumed[nextIdx] = true;
+            else break;
+            idx = nextIdx;
+        }
+    }
+
+    // --- PASS 3: Build result polygon ---
+    var result = [];
+
+    for (var i = 0; i < n; i++) {
+        // Skip consumed vertices (they're inside a fillet arc)
+        if (consumed[i]) continue;
+
+        // Non-significant, non-consumed vertices pass through
+        if (!isSignificant[i]) {
+            result.push(poly[i]);
+            continue;
+        }
+
+        var prev = poly[(i + n - 1) % n];
+        var curr = poly[i];
+        var next = poly[(i + 1) % n];
+
+        var d1x = prev[0] - curr[0], d1y = prev[1] - curr[1];
+        var d2x = next[0] - curr[0], d2y = next[1] - curr[1];
+        var len1 = Math.sqrt(d1x * d1x + d1y * d1y);
+        var len2 = Math.sqrt(d2x * d2x + d2y * d2y);
+
+        if (len1 < 1e-9 || len2 < 1e-9) { result.push(curr); continue; }
+
+        var u1x = d1x / len1, u1y = d1y / len1;
+        var u2x = d2x / len2, u2y = d2y / len2;
+        var dot = u1x * u2x + u1y * u2y;
+        dot = Math.max(-1, Math.min(1, dot));
+        var angle = Math.acos(dot);
+        var halfAngle = angle / 2;
+
+        if (Math.abs(Math.sin(halfAngle)) < 1e-9) { result.push(curr); continue; }
+
+        var tangentDist = tangentDists[i];
+        if (tangentDist <= 0) { result.push(curr); continue; }
+        var effectiveR = tangentDist * Math.tan(halfAngle);
+
+        // Tangent points
+        var t1x = curr[0] + u1x * tangentDist;
+        var t1y = curr[1] + u1y * tangentDist;
+        var t2x = curr[0] + u2x * tangentDist;
+        var t2y = curr[1] + u2y * tangentDist;
+
+        // Center of fillet circle
+        var bisX = u1x + u2x, bisY = u1y + u2y;
+        var bisLen = Math.sqrt(bisX * bisX + bisY * bisY);
+        if (bisLen < 1e-9) { result.push(curr); continue; }
+        bisX /= bisLen; bisY /= bisLen;
+        var centerDist = effectiveR / Math.sin(halfAngle);
+        var cxF = curr[0] + bisX * centerDist;
+        var cyF = curr[1] + bisY * centerDist;
+
+        // Arc from t1 to t2
+        var startAngle = Math.atan2(t1y - cyF, t1x - cxF);
+        var endAngle = Math.atan2(t2y - cyF, t2x - cxF);
+
+        var cross = u1x * u2y - u1y * u2x;
+        var arcDir = (cross > 0) ? -1 : 1;
+
+        var sweep = endAngle - startAngle;
+        if (arcDir > 0) {
+            while (sweep < 0) sweep += 2 * Math.PI;
+            if (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
+        } else {
+            while (sweep > 0) sweep -= 2 * Math.PI;
+            if (sweep < -2 * Math.PI) sweep += 2 * Math.PI;
+        }
+
+        for (var s = 0; s <= arcSegments; s++) {
+            var t = s / arcSegments;
+            var a2 = startAngle + sweep * t;
+            result.push([cxF + effectiveR * Math.cos(a2), cyF + effectiveR * Math.sin(a2)]);
+        }
+    }
+
+    return result;
+}
+
+// ============================================================
+// SVG HELPERS
+// ============================================================
+var SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgCirclePath(cx, cy, r) {
+    // Returns a path "d" string for a circle (two arcs)
+    return 'M' + (cx - r) + ',' + cy +
+           'A' + r + ',' + r + ' 0 1,0 ' + (cx + r) + ',' + cy +
+           'A' + r + ',' + r + ' 0 1,0 ' + (cx - r) + ',' + cy + 'Z';
+}
+
+function createSvgElement(tag, attrs) {
+    var el = document.createElementNS(SVG_NS, tag);
+    for (var k in attrs) {
+        if (attrs.hasOwnProperty(k)) el.setAttribute(k, attrs[k]);
+    }
+    return el;
+}
+
+function polygonToPathD(poly) {
+    if (!poly || poly.length < 3) return '';
+    var d = 'M' + poly[0][0] + ',' + poly[0][1];
+    for (var i = 1; i < poly.length; i++) {
+        d += 'L' + poly[i][0] + ',' + poly[i][1];
+    }
+    d += 'Z';
+    return d;
+}
+
+// ============================================================
+// POLYGON CLIPPING (Sutherland-Hodgman)
+// Clips subject polygon against convex clip polygon.
+// Returns the intersection (part of subject inside clip).
+// ============================================================
+function sutherlandHodgman(subject, clip) {
+    if (!subject || subject.length < 3) return [];
+    if (!clip || clip.length < 3) return [];
+
+    var output = subject.slice();
+
+    for (var i = 0; i < clip.length; i++) {
+        if (output.length === 0) return [];
+        var input = output;
+        output = [];
+
+        var edgeStart = clip[i];
+        var edgeEnd = clip[(i + 1) % clip.length];
+
+        for (var j = 0; j < input.length; j++) {
+            var current = input[j];
+            var previous = input[(j + input.length - 1) % input.length];
+
+            var currInside = isInsideEdge(current, edgeStart, edgeEnd);
+            var prevInside = isInsideEdge(previous, edgeStart, edgeEnd);
+
+            if (currInside) {
+                if (!prevInside) {
+                    var inter = lineIntersect(previous, current, edgeStart, edgeEnd);
+                    if (inter) output.push(inter);
+                }
+                output.push(current);
+            } else if (prevInside) {
+                var inter = lineIntersect(previous, current, edgeStart, edgeEnd);
+                if (inter) output.push(inter);
+            }
+        }
+    }
+    return output;
+}
+
+function isInsideEdge(point, edgeStart, edgeEnd) {
+    // Returns true if point is on the left side of the edge (inside)
+    return (edgeEnd[0] - edgeStart[0]) * (point[1] - edgeStart[1]) -
+           (edgeEnd[1] - edgeStart[1]) * (point[0] - edgeStart[0]) >= 0;
+}
+
+function lineIntersect(p1, p2, p3, p4) {
+    var x1 = p1[0], y1 = p1[1], x2 = p2[0], y2 = p2[1];
+    var x3 = p3[0], y3 = p3[1], x4 = p4[0], y4 = p4[1];
+    var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 1e-12) return null;
+    var t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
+}
+
+// ============================================================
+// POLYGON vs CIRCLE CLIPPING
+// Clips a polygon to keep only the part inside a circle (keepInside=true)
+// or outside a circle (keepInside=false).
+// Approximates arc segments with line segments.
+// ============================================================
+function clipPolygonByCircle(poly, cx, cy, r, keepInside) {
+    if (!poly || poly.length < 3) return [];
+    var result = [];
+    var n = poly.length;
+
+    for (var i = 0; i < n; i++) {
+        var curr = poly[i];
+        var next = poly[(i + 1) % n];
+        var currIn = isInsideCircle(curr, cx, cy, r, keepInside);
+        var nextIn = isInsideCircle(next, cx, cy, r, keepInside);
+
+        if (currIn) result.push(curr);
+
+        if (currIn !== nextIn) {
+            // Edge crosses circle boundary
+            var intersections = lineCircleIntersect(curr, next, cx, cy, r);
+            for (var k = 0; k < intersections.length; k++) {
+                result.push(intersections[k]);
+            }
+        }
+    }
+    return result.length >= 3 ? result : [];
+}
+
+function isInsideCircle(p, cx, cy, r, keepInside) {
+    var dx = p[0] - cx, dy = p[1] - cy;
+    var dist2 = dx * dx + dy * dy;
+    return keepInside ? (dist2 <= r * r + 1e-9) : (dist2 >= r * r - 1e-9);
+}
+
+function lineCircleIntersect(p1, p2, cx, cy, r) {
+    // Returns intersection points of line segment p1-p2 with circle (cx,cy,r)
+    var dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+    var fx = p1[0] - cx, fy = p1[1] - cy;
+    var a = dx * dx + dy * dy;
+    var b = 2 * (fx * dx + fy * dy);
+    var c = fx * fx + fy * fy - r * r;
+    var disc = b * b - 4 * a * c;
+    var results = [];
+    if (disc < 0) return results;
+    disc = Math.sqrt(disc);
+    var t1 = (-b - disc) / (2 * a);
+    var t2 = (-b + disc) / (2 * a);
+    if (t1 >= 0 && t1 <= 1) results.push([p1[0] + t1 * dx, p1[1] + t1 * dy]);
+    if (t2 >= 0 && t2 <= 1 && Math.abs(t2 - t1) > 1e-12) results.push([p1[0] + t2 * dx, p1[1] + t2 * dy]);
+    return results;
+}
+
+// ============================================================
+// SECTOR GEOMETRY
+// Builds the "reduced sector" polygon: annular wedge minus stems.
+// sector_start, sector_end: angles in radians (CCW from +x)
+// rInner, rOuter: ring radii
+// stemW: stem half-width (SectorsStem_th / 2)
+// Arc resolution: number of segments per arc
+// ============================================================
+function buildReducedSector(sector_start, sector_end, rInner, rOuter, stemW, arcRes) {
+    arcRes = arcRes || 60;
+
+    // The stem edges are lines parallel to the radial boundaries,
+    // offset inward by stemW (constant perpendicular width).
+    // Left boundary (at sector_start): offset into sector = stemW
+    // Right boundary (at sector_end): offset into sector = stemW
+
+    // Angle offsets for stem at inner and outer radii
+    var dAngle_inner_left = Math.asin(Math.min(stemW / rInner, 1));
+    var dAngle_outer_left = Math.asin(Math.min(stemW / rOuter, 1));
+    var dAngle_inner_right = Math.asin(Math.min(stemW / rInner, 1));
+    var dAngle_outer_right = Math.asin(Math.min(stemW / rOuter, 1));
+
+    // Effective angular range after stem removal
+    var ang_start_inner = sector_start + dAngle_inner_left;
+    var ang_start_outer = sector_start + dAngle_outer_left;
+    var ang_end_inner = sector_end - dAngle_inner_right;
+    var ang_end_outer = sector_end - dAngle_outer_right;
+
+    // Build polygon: outer arc (CCW from start to end), then inner arc (CW from end to start)
+    var poly = [];
+
+    // Left stem edge: straight line from inner-left to outer-left
+    poly.push([rInner * Math.cos(ang_start_inner), rInner * Math.sin(ang_start_inner)]);
+
+    // Outer arc from start to end
+    var outerStep = (ang_end_outer - ang_start_outer) / arcRes;
+    for (var i = 0; i <= arcRes; i++) {
+        var a = ang_start_outer + i * outerStep;
+        poly.push([rOuter * Math.cos(a), rOuter * Math.sin(a)]);
+    }
+
+    // Right stem edge: straight line from outer-right to inner-right
+    poly.push([rInner * Math.cos(ang_end_inner), rInner * Math.sin(ang_end_inner)]);
+
+    // Inner arc from end back to start (clockwise = decreasing angle)
+    var innerStep = (ang_end_inner - ang_start_inner) / arcRes;
+    for (var i = arcRes; i >= 0; i--) {
+        var a = ang_start_inner + i * innerStep;
+        poly.push([rInner * Math.cos(a), rInner * Math.sin(a)]);
+    }
+
+    return poly;
+}
+
+// ============================================================
+// SLIT GENERATION
+// Generates a slit rectangle at perpendicular offset 'offset' from origin,
+// with given tilt angle (radians), width (slits_d), and length.
+// Returns 4-vertex polygon (convex rectangle).
+// ============================================================
+function buildSlitRect(tiltRad, offset, slitWidth, length) {
+    // Slit direction: along the tilt angle
+    var ax = Math.cos(tiltRad), ay = Math.sin(tiltRad);
+    // Perpendicular direction (90° CCW from slit direction)
+    var px = -ay, py = ax;
+
+    // Center of slit
+    var cx = offset * px, cy = offset * py;
+
+    // Half dimensions
+    var hl = length / 2;
+    var hw = slitWidth / 2;
+
+    // Rectangle vertices (CCW winding)
+    return [
+        [cx - hl * ax - hw * px, cy - hl * ay - hw * py],
+        [cx + hl * ax - hw * px, cy + hl * ay - hw * py],
+        [cx + hl * ax + hw * px, cy + hl * ay + hw * py],
+        [cx - hl * ax + hw * px, cy - hl * ay + hw * py]
+    ];
+}
+
+// ============================================================
+// GENERATE SLITS FOR A SECTOR
+// Returns array of polygons (clipped slits) for one sector.
+// tiltDeg: absolute tilt angle of slits (degrees)
+// sector_start, sector_end: sector angular bounds (degrees)
+// rInner, rOuter: ring radii
+// stemW: half stem width
+// ============================================================
+function generateSectorSlits(tiltDeg, sector_start_deg, sector_end_deg, rInner, rOuter, stemW) {
+    var p = params;
+    var tiltRad = deg2rad(tiltDeg);
+    var sector_start = deg2rad(sector_start_deg);
+    var sector_end = deg2rad(sector_end_deg);
+
+    // Build reduced sector polygon
+    var reducedSector = buildReducedSector(sector_start, sector_end, rInner, rOuter, stemW, 120);
+
+    // Generate slits covering the full extent
+    var maxExtent = rOuter;
+    var slitLength = 2 * rOuter + 10; // generous length
+
+    var slits = [];
+    var k_max = Math.ceil(maxExtent / p.slits_step);
+
+    for (var k = -k_max; k <= k_max; k++) {
+        var offset = k * p.slits_step;
+        var slitRect = buildSlitRect(tiltRad, offset, p.slits_d, slitLength);
+
+        // Clip: intersection of reducedSector with slitRect
+        // S-H with subject=reducedSector, clip=slitRect (convex)
+        var clipped = sutherlandHodgman(reducedSector, slitRect);
+
+        if (clipped && clipped.length >= 3) {
+            // Filter zero-width / degenerate slits by checking area
+            var slitArea = Math.abs(polyArea(clipped));
+            var minArea = p.slits_d * p.slits_d * 0.05; // minimum viable slit area
+            if (slitArea > minArea) {
+                // PINCH-SPLIT: detect and split polygons with zero-width sections
+                var splitParts = splitPinchedPolygon(clipped);
+                for (var sp = 0; sp < splitParts.length; sp++) {
+                    var part = splitParts[sp];
+                    if (part.length >= 3 && Math.abs(polyArea(part)) > minArea) {
+                        slits.push(part);
+                    }
+                }
+            }
+        }
+    }
+
+    return slits;
+}
+
+// ============================================================
+// SLIT PINCH-SPLITTING: detect and split polygons that have
+// parallel touching edges (zero-width sections) into separate parts.
+// A pinch point is where two non-adjacent edges of the polygon
+// share the same point or come very close (within tolerance).
+// ============================================================
+function splitPinchedPolygon(poly) {
+    if (!poly || poly.length < 4) return [poly];
+    var n = poly.length;
+    var TOL = 0.01; // tolerance for coincident points
+    
+    // Find pinch points: vertex i and vertex j (non-adjacent) that are very close
+    for (var i = 0; i < n; i++) {
+        for (var j = i + 2; j < n; j++) {
+            if (i === 0 && j === n - 1) continue; // adjacent via wrap
+            var dx = poly[i][0] - poly[j][0];
+            var dy = poly[i][1] - poly[j][1];
+            if (Math.sqrt(dx * dx + dy * dy) < TOL) {
+                // Found a pinch at i,j - split into two polygons
+                var poly1 = poly.slice(i, j + 1);
+                var poly2 = poly.slice(j).concat(poly.slice(0, i + 1));
+                
+                // Filter out degenerate results
+                var results = [];
+                if (poly1.length >= 3 && Math.abs(polyArea(poly1)) > TOL * TOL) {
+                    // Recursively check for more pinch points
+                    results = results.concat(splitPinchedPolygon(poly1));
+                }
+                if (poly2.length >= 3 && Math.abs(polyArea(poly2)) > TOL * TOL) {
+                    results = results.concat(splitPinchedPolygon(poly2));
+                }
+                return results.length > 0 ? results : [poly];
+            }
+        }
+    }
+    
+    // Also check for near-zero-width sections: consecutive parallel edges
+    // where the polygon narrows to near zero width
+    // Detect by finding segments where opposite edges are very close and parallel
+    for (var i = 0; i < n; i++) {
+        var pi = poly[i];
+        // Check against all non-adjacent edges
+        for (var j = 0; j < n; j++) {
+            if (j === i || j === (i + n - 1) % n || j === (i + 1) % n) continue;
+            var ej0 = poly[j];
+            var ej1 = poly[(j + 1) % n];
+            // Distance from point pi to segment ej0-ej1
+            var segDx = ej1[0] - ej0[0], segDy = ej1[1] - ej0[1];
+            var segLen2 = segDx * segDx + segDy * segDy;
+            if (segLen2 < 1e-18) continue;
+            var t = ((pi[0] - ej0[0]) * segDx + (pi[1] - ej0[1]) * segDy) / segLen2;
+            if (t < 0.05 || t > 0.95) continue; // only interior projections
+            var projX = ej0[0] + t * segDx, projY = ej0[1] + t * segDy;
+            var distToSeg = Math.sqrt((pi[0] - projX) * (pi[0] - projX) + (pi[1] - projY) * (pi[1] - projY));
+            if (distToSeg < TOL) {
+                // Vertex i touches edge j - split here
+                var splitPt = [projX, projY];
+                // Insert splitPt into edge j, then split polygon at i and the inserted point
+                var newPoly = [];
+                for (var k = 0; k < n; k++) {
+                    newPoly.push(poly[k]);
+                    if (k === j) newPoly.push(splitPt);
+                }
+                // Now find the indices of vertex i and splitPt in newPoly
+                var idxI = (i <= j) ? i : i + 1; // account for inserted point
+                var idxS = j + 1; // the inserted split point
+                
+                var poly1, poly2;
+                if (idxI < idxS) {
+                    poly1 = newPoly.slice(idxI, idxS + 1);
+                    poly2 = newPoly.slice(idxS).concat(newPoly.slice(0, idxI + 1));
+                } else {
+                    poly1 = newPoly.slice(idxS, idxI + 1);
+                    poly2 = newPoly.slice(idxI).concat(newPoly.slice(0, idxS + 1));
+                }
+                
+                var results = [];
+                if (poly1.length >= 3 && Math.abs(polyArea(poly1)) > TOL * TOL) {
+                    results = results.concat(splitPinchedPolygon(poly1));
+                }
+                if (poly2.length >= 3 && Math.abs(polyArea(poly2)) > TOL * TOL) {
+                    results = results.concat(splitPinchedPolygon(poly2));
+                }
+                return results.length > 0 ? results : [poly];
+            }
+        }
+    }
+    
+    return [poly];
+}
+
+// ============================================================
+// MASK DRAWING
+// ============================================================
+// Stores all slit polygons (in math coords, y-up) for 3D export
+var collectedSlits = [];
+
+function drawMask() {
+    updateDerived();
+    collectedSlits = []; // reset for this draw
+    var svg = document.getElementById('maskSvg');
+    var p = params;
+
+    var totalR = p.TDiam / 2;
+    var vbSize = p.TDiam * 1.1;
+    svg.setAttribute('viewBox', (-vbSize/2) + ' ' + (-vbSize/2) + ' ' + vbSize + ' ' + vbSize);
+
+    // Set physical dimensions and DPI for SVG export
+    // DPI = 96 (standard screen). SVG width/height define the real-world size.
+    // viewBox maps to the width/height, so 1 SVG user unit = 1 mm (or 1 inch).
+    var isInchesUnit = (document.getElementById('units').value === 'inches');
+    if (isInchesUnit) {
+        // Convert internal mm values to inches for SVG dimensions
+        var vbSizeInch = vbSize / 25.4;
+        svg.setAttribute('width', vbSizeInch.toFixed(4) + 'in');
+        svg.setAttribute('height', vbSizeInch.toFixed(4) + 'in');
+    } else {
+        svg.setAttribute('width', vbSize.toFixed(2) + 'mm');
+        svg.setAttribute('height', vbSize.toFixed(2) + 'mm');
+    }
+
+    // Clear previous content
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    // Calculate ring boundaries (radii from center)
+    var r_hole = p.Rh;                              // Central hole outer edge
+    var r_R1_outer = p.Rh + p.Rth;                  // R1 outer = R2 inner
+    var r_R2_outer = r_R1_outer + p.slits_w2;       // R2 outer = R3 inner
+    var r_R3_outer = r_R2_outer + p.Rth;            // R3 outer = R4 inner
+    var r_R4_outer = r_R3_outer + p.slits_w4;       // R4 outer = R5 inner
+
+    // Store boundaries for slit generation (used in later steps)
+    derived.r_hole = r_hole;
+    derived.r_R2_inner = r_R1_outer;
+    derived.r_R2_outer = r_R2_outer;
+    derived.r_R4_inner = r_R3_outer;
+    derived.r_R4_outer = r_R4_outer;
+
+    // ================================================================
+    // PHASE 1: Generate all slit polygons (before rendering anything)
+    // ================================================================
+    var r2Colors = ['#FF0000', '#00FF00', '#0000FF'];
+    var stemHalfW = p.SectorsStem_th / 2;
+    var roundR = p.Rounding * p.slits_d / 2;
+    var ColRel = 0.20;
+
+    // Structure: array of {poly, color} for all slits
+    var allSlitData = [];
+
+    // R2 slits: 3 sectors at 0°, 120°, 240°
+    for (var si = 0; si < 3; si++) {
+        var sectorBase = si * 120;
+        var sectorStart = sectorBase - 60;
+        var sectorEnd = sectorBase + 60;
+        var tilt = sectorBase + p.A_off;
+
+        var slits = generateSectorSlits(tilt, sectorStart, sectorEnd,
+                                         r_R1_outer, r_R2_outer, stemHalfW);
+        for (var j = 0; j < slits.length; j++) {
+            var poly = slits[j];
+            if (roundR > 0) poly = applyRounding(poly, roundR, 12);
+            collectedSlits.push(poly);
+            allSlitData.push({ poly: poly, color: r2Colors[si] });
+        }
+    }
+
+    // R4 slits: 6 subsectors
+    var r4Subsectors = [
+        { center: 210, tilt:   0 + p.A_off + p.As, colorIdx: 0, variant: 'a' },
+        { center: 150, tilt:   0 + p.A_off - p.As, colorIdx: 0, variant: 'b' },
+        { center: 330, tilt: 120 + p.A_off + p.As, colorIdx: 1, variant: 'a' },
+        { center: 270, tilt: 120 + p.A_off - p.As, colorIdx: 1, variant: 'b' },
+        { center:  90, tilt: 240 + p.A_off + p.As, colorIdx: 2, variant: 'a' },
+        { center:  30, tilt: 240 + p.A_off - p.As, colorIdx: 2, variant: 'b' }
+    ];
+
+    for (var si = 0; si < r4Subsectors.length; si++) {
+        var sub = r4Subsectors[si];
+        var subStart = sub.center - 30;
+        var subEnd = sub.center + 30;
+        var baseColor = r2Colors[sub.colorIdx];
+        var delta = (sub.variant === 'a') ? ColRel : -ColRel;
+        var slitColor = adjustColorLuminosity(baseColor, delta);
+
+        var slits = generateSectorSlits(sub.tilt, subStart, subEnd,
+                                         r_R3_outer, r_R4_outer, stemHalfW);
+        for (var j = 0; j < slits.length; j++) {
+            var poly = slits[j];
+            if (roundR > 0) poly = applyRounding(poly, roundR, 12);
+            collectedSlits.push(poly);
+            allSlitData.push({ poly: poly, color: slitColor });
+        }
+    }
+
+    // ================================================================
+    // PHASE 2: Render SVG using clipPath approach
+    // The mask (outer circle minus central hole) is drawn as a filled path.
+    // A clipPath excludes all slit and mounting hole areas from visibility.
+    // This avoids evenodd parity issues when slits overlap the central hole.
+    // ================================================================
+
+    // Build the exclusion clipPath: a large rectangle minus all slits and mounting holes
+    var clipExtent = totalR + 10;
+    var exclusionD = 'M' + (-clipExtent) + ',' + (-clipExtent) +
+                     'L' + clipExtent + ',' + (-clipExtent) +
+                     'L' + clipExtent + ',' + clipExtent +
+                     'L' + (-clipExtent) + ',' + clipExtent + 'Z';
+
+    // Add each slit polygon to the exclusion path (they become holes via evenodd)
+    for (var i = 0; i < allSlitData.length; i++) {
+        var sd = allSlitData[i];
+        var svgPoly = [];
+        for (var v = 0; v < sd.poly.length; v++) {
+            svgPoly.push([sd.poly[v][0], -sd.poly[v][1]]);
+        }
+        var slitPathD = polygonToPathD(svgPoly);
+        if (slitPathD) exclusionD += slitPathD;
+    }
+
+    // Add mounting holes to the exclusion path
+    var mountingHoleCenters = [];
+    if (p.WithMountingHoles && p.RHole > 0) {
+        var r5CenterR = (p.MHolesPos > 0) ? p.MHolesPos : (r_R4_outer + totalR) / 2;
+        for (var mhi = 0; mhi < 3; mhi++) {
+            var mhAngle = mhi * 120 * Math.PI / 180;
+            var mhCx = r5CenterR * Math.cos(mhAngle);
+            var mhCy = r5CenterR * Math.sin(mhAngle);
+            mountingHoleCenters.push([mhCx, mhCy]);
+            exclusionD += svgCirclePath(mhCx, -mhCy, p.RHole);
+        }
+    }
+
+    // Create defs with clipPath
+    var defs = createSvgElement('defs', {});
+    var slitClipPath = createSvgElement('clipPath', { id: 'slitExclusion' });
+    slitClipPath.appendChild(createSvgElement('path', {
+        d: exclusionD,
+        'fill-rule': 'evenodd'
+    }));
+    defs.appendChild(slitClipPath);
+    svg.appendChild(defs);
+
+    // Layer 1: Black mask (outer circle minus central hole), clipped to exclude slits
+    var maskPath = svgCirclePath(0, 0, totalR) + svgCirclePath(0, 0, r_hole);
+    var maskGroup = createSvgElement('g', { 'clip-path': 'url(#slitExclusion)' });
+    maskGroup.appendChild(createSvgElement('path', {
+        d: maskPath,
+        fill: '#000000',
+        stroke: 'none',
+        'fill-rule': 'evenodd'
+    }));
+    svg.appendChild(maskGroup);
+
+    // Layer 2: Colored slit edges (strokes only, no fill) for identification
+    for (var i = 0; i < allSlitData.length; i++) {
+        var sd = allSlitData[i];
+        var svgPoly = [];
+        for (var v = 0; v < sd.poly.length; v++) {
+            svgPoly.push([sd.poly[v][0], -sd.poly[v][1]]);
+        }
+        var pathD = polygonToPathD(svgPoly);
+        if (pathD) {
+            svg.appendChild(createSvgElement('path', {
+                d: pathD,
+                fill: 'none',
+                stroke: sd.color,
+                'stroke-width': 0.3
+            }));
+        }
+    }
+
+    // (Outer border and scale bar removed from SVG for clean selectable objects)
+
+    // ---- SPLIT FEATURE ----
+    // If Split is enabled, clip entire mask to a circular sector from -60° to +60°
+    if (p.Split) {
+        var clipR = totalR + 1;
+        // Build pie wedge polygon: center + arc from -60° to +60°
+        var splitArcRes = 60;
+        var splitPoly = [[0, 0]];
+        for (var i = 0; i <= splitArcRes; i++) {
+            var a = deg2rad(-60 + (120 * i / splitArcRes));
+            splitPoly.push([clipR * Math.cos(a), clipR * Math.sin(a)]);
+        }
+        splitPoly.push([0, 0]);
+
+        // Convert to SVG coords (negate y)
+        var clipD = 'M0,0';
+        for (var i = 1; i < splitPoly.length - 1; i++) {
+            clipD += 'L' + splitPoly[i][0] + ',' + (-splitPoly[i][1]);
+        }
+        clipD += 'Z';
+
+        // Create clipPath and add to existing defs
+        var clipPathEl = createSvgElement('clipPath', { id: 'splitClip' });
+        var clipShape = createSvgElement('path', { d: clipD });
+        clipPathEl.appendChild(clipShape);
+        // Add to the existing <defs> element
+        var existingDefs = svg.querySelector('defs');
+        existingDefs.appendChild(clipPathEl);
+
+        // Wrap all current svg children in a group with the clip
+        var group = createSvgElement('g', { 'clip-path': 'url(#splitClip)' });
+        while (svg.firstChild) {
+            group.appendChild(svg.firstChild);
+        }
+        svg.appendChild(group);
+    }
+
+    // Update SVG source textarea
+    var serializer = new XMLSerializer();
+    document.getElementById('svgSrc').value = serializer.serializeToString(svg);
+}
+
+// ============================================================
+// UI BINDING
+// ============================================================
+function readUI() {
+    var unitFactor = (document.getElementById('units').value === 'inches') ? 25.4 : 1;
+
+    params.FL = parseFloat(document.getElementById('focalLength').value) * unitFactor;
+    params.Diam = parseFloat(document.getElementById('lensDiam').value) * unitFactor;
+    params.TDiam = parseFloat(document.getElementById('tubeDiam').value) * unitFactor;
+    params.Rh = parseFloat(document.getElementById('centralHole').value) * unitFactor / 2; // UI is diameter
+    params.Sd_Sst_rat = parseFloat(document.getElementById('slitStemRatio').value);
+    params.SlitsRatio = parseFloat(document.getElementById('slitsRatio').value);
+    if (params.SlitsRatio <= 0) params.SlitsRatio = 1;
+    params.BahF = parseFloat(document.getElementById('bahtinovFactor').value);
+    params.OF = document.getElementById('thirdOrder').checked ? 3 : 1;
+    params.As = parseFloat(document.getElementById('bahtinovAngle').value);
+    params.A_off = parseFloat(document.getElementById('offsetAngle').value);
+    params.Rth = parseFloat(document.getElementById('ringBorder').value) * unitFactor;
+    params.SectorsStem_th = parseFloat(document.getElementById('sectorBorder').value) * unitFactor;
+    params.Rounding = parseFloat(document.getElementById('rounding').value);
+    params.Thickness3D = parseFloat(document.getElementById('thickness3D').value) * unitFactor;
+    params.Split = document.getElementById('splitMask').checked;
+    params.WithMountingHoles = document.getElementById('mountingHoles').checked;
+    params.RHole = parseFloat(document.getElementById('mountingHoleSize').value) * unitFactor;
+    params.MHolesPos = parseFloat(document.getElementById('mountingHolePos').value) * unitFactor;
+    if (isNaN(params.MHolesPos) || params.MHolesPos <= 0) params.MHolesPos = 0;
+}
+
+function onParamChange() {
+    readUI();
+    drawMask();
+}
+
+// Attach event listeners
+function initUI() {
+    var inputs = document.querySelectorAll('#controls-panel input[type="text"], #controls-panel input[type="number"]');
+    inputs.forEach(function(el) {
+        el.addEventListener('change', onParamChange);
+        el.addEventListener('keydown', function(e) { if (e.key === 'Enter') onParamChange(); });
+    });
+    var selects = document.querySelectorAll('#controls-panel select');
+    selects.forEach(function(el) {
+        el.addEventListener('change', onParamChange);
+    });
+    var checks = document.querySelectorAll('#controls-panel input[type="checkbox"]');
+    checks.forEach(function(el) {
+        el.addEventListener('change', onParamChange);
+    });
+
+    // Unit conversion on unit change
+    document.getElementById('units').addEventListener('change', handleUnitChange);
+
+    // Download buttons
+    document.getElementById('btnDownloadSVG').addEventListener('click', downloadSVG);
+    document.getElementById('btnDownload3D').addEventListener('click', downloadSTL);
+    document.getElementById('btnDownload3DScanline').addEventListener('click', downloadSTL_Scanline);
+}
+
+var previousUnit = 'mm';
+function handleUnitChange() {
+    var newUnit = document.getElementById('units').value;
+    var factor = (previousUnit === 'mm' && newUnit === 'inches') ? 1/25.4 :
+                 (previousUnit === 'inches' && newUnit === 'mm') ? 25.4 : 1;
+
+    if (factor !== 1) {
+        var fields = ['focalLength', 'lensDiam', 'tubeDiam', 'centralHole', 'ringBorder', 'sectorBorder', 'thickness3D', 'mountingHoleSize'];
+        fields.forEach(function(id) {
+            var el = document.getElementById(id);
+            el.value = (parseFloat(el.value) * factor).toFixed(4).replace(/\.?0+$/, '');
+        });
+        // Handle mountingHolePos separately (may be empty)
+        var mhpEl = document.getElementById('mountingHolePos');
+        if (mhpEl.value.trim() !== '' && !isNaN(parseFloat(mhpEl.value))) {
+            mhpEl.value = (parseFloat(mhpEl.value) * factor).toFixed(4).replace(/\.?0+$/, '');
+        }
+    }
+    previousUnit = newUnit;
+    onParamChange();
+}
+
+function downloadSVG() {
+    var content = document.getElementById('svgSrc').value;
+    var blob = new Blob([content], { type: 'image/svg+xml' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '3Bahtinov.svg';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// STL EXPORT
+// Generates ASCII STL by extruding the mask (disk - hole - slits)
+// Uses ear-clipping triangulation on a polygon-with-holes
+// ============================================================
+
+// Create a circle polygon (CCW winding in math coords)
+function makeCirclePoly(cx, cy, r, segments) {
+    var poly = [];
+    for (var i = 0; i < segments; i++) {
+        var a = (2 * Math.PI * i) / segments;
+        poly.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return poly;
+}
+
+// Reverse polygon winding
+function reversePoly(poly) {
+    return poly.slice().reverse();
+}
+
+// Compute signed area of polygon (positive = CCW)
+function polyArea(poly) {
+    var area = 0;
+    for (var i = 0; i < poly.length; i++) {
+        var j = (i + 1) % poly.length;
+        area += poly[i][0] * poly[j][1];
+        area -= poly[j][0] * poly[i][1];
+    }
+    return area / 2;
+}
+
+// Ensure polygon is CCW
+function ensureCCW(poly) {
+    return polyArea(poly) >= 0 ? poly : reversePoly(poly);
+}
+
+// Ensure polygon is CW
+function ensureCW(poly) {
+    return polyArea(poly) <= 0 ? poly : reversePoly(poly);
+}
+
+// Ear-clipping triangulation for a simple polygon
+// Returns array of triangles [[p1,p2,p3], ...]
+function earClipTriangulate(poly) {
+    if (poly.length < 3) return [];
+    if (poly.length === 3) return [[poly[0], poly[1], poly[2]]];
+
+    var verts = poly.map(function(p, i) { return { x: p[0], y: p[1], idx: i }; });
+    var triangles = [];
+
+    function cross2D(o, a, b) {
+        return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    }
+
+    function isConvex(prev, curr, next) {
+        return cross2D(prev, curr, next) > 0;
+    }
+
+    function pointInTriangle(p, a, b, c) {
+        var d1 = cross2D(a, b, p);
+        var d2 = cross2D(b, c, p);
+        var d3 = cross2D(c, a, p);
+        var hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        var hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+        return !(hasNeg && hasPos);
+    }
+
+    function isEar(i, verts) {
+        var n = verts.length;
+        var prev = verts[(i + n - 1) % n];
+        var curr = verts[i];
+        var next = verts[(i + 1) % n];
+        if (!isConvex(prev, curr, next)) return false;
+        for (var j = 0; j < n; j++) {
+            if (j === (i + n - 1) % n || j === i || j === (i + 1) % n) continue;
+            if (pointInTriangle(verts[j], prev, curr, next)) return false;
+        }
+        return true;
+    }
+
+    var maxIter = verts.length * verts.length;
+    var iter = 0;
+    while (verts.length > 3 && iter < maxIter) {
+        var found = false;
+        for (var i = 0; i < verts.length; i++) {
+            if (isEar(i, verts)) {
+                var n = verts.length;
+                var prev = verts[(i + n - 1) % n];
+                var curr = verts[i];
+                var next = verts[(i + 1) % n];
+                triangles.push([[prev.x, prev.y], [curr.x, curr.y], [next.x, next.y]]);
+                verts.splice(i, 1);
+                found = true;
+                break;
+            }
+        }
+        if (!found) break; // degenerate polygon
+        iter++;
+    }
+    if (verts.length === 3) {
+        triangles.push([[verts[0].x, verts[0].y], [verts[1].x, verts[1].y], [verts[2].x, verts[2].y]]);
+    }
+    return triangles;
+}
+
+// Merge holes into outer polygon using bridge edges
+// outer: CCW polygon, holes: array of CW polygons
+// Returns a single simple polygon
+function mergeHolesIntoPoly(outer, holes) {
+    if (!holes || holes.length === 0) return outer.slice();
+
+    var result = outer.slice();
+
+    // Sort holes by their rightmost x coordinate (descending)
+    var sortedHoles = holes.map(function(h, i) {
+        var maxX = -Infinity;
+        var maxIdx = 0;
+        for (var j = 0; j < h.length; j++) {
+            if (h[j][0] > maxX) { maxX = h[j][0]; maxIdx = j; }
+        }
+        return { poly: h, maxX: maxX, maxIdx: maxIdx };
+    }).sort(function(a, b) { return b.maxX - a.maxX; });
+
+    for (var hi = 0; hi < sortedHoles.length; hi++) {
+        var hole = sortedHoles[hi];
+        var holePoint = hole.poly[hole.maxIdx];
+
+        // Find the closest visible point on the result polygon
+        var bestDist = Infinity;
+        var bestIdx = 0;
+        for (var i = 0; i < result.length; i++) {
+            var dx = result[i][0] - holePoint[0];
+            var dy = result[i][1] - holePoint[1];
+            var dist = dx * dx + dy * dy;
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = i;
+            }
+        }
+
+        // Insert bridge: result[bestIdx] -> hole[maxIdx] -> ... -> hole[maxIdx] -> result[bestIdx]
+        var newPoly = [];
+        for (var i = 0; i <= bestIdx; i++) newPoly.push(result[i]);
+        // Walk hole from maxIdx around back to maxIdx
+        for (var i = 0; i <= hole.poly.length; i++) {
+            newPoly.push(hole.poly[(hole.maxIdx + i) % hole.poly.length]);
+        }
+        // Bridge back
+        for (var i = bestIdx; i < result.length; i++) newPoly.push(result[i]);
+
+        result = newPoly;
+    }
+
+    return result;
+}
+
+// Generate ASCII STL string
+// The mask is exported as a SINGLE watertight solid:
+// outer boundary with all holes (central hole, slits, mounting holes) merged
+// via bridge edges into one polygon, then triangulated and extruded.
+function generateSTL() {
+    var p = params;
+    var thickness = p.Thickness3D;
+    var circleRes = 120;
+    var isInches = (document.getElementById('units').value === 'inches');
+
+    // Outer boundary
+    var outerPoly = makeCirclePoly(0, 0, p.TDiam / 2, circleRes);
+    outerPoly = ensureCCW(outerPoly);
+
+    // Central hole (CW for hole)
+    var holePoly = makeCirclePoly(0, 0, p.Rh, Math.max(36, Math.round(circleRes * p.Rh / (p.TDiam / 2))));
+    holePoly = ensureCW(holePoly);
+
+    // Collect ALL holes (central hole + slits + mounting holes)
+    var allHoles = [holePoly];
+    for (var i = 0; i < collectedSlits.length; i++) {
+        var slit = collectedSlits[i];
+        if (slit.length >= 3) {
+            allHoles.push(ensureCW(slit));
+        }
+    }
+
+    // Mounting holes
+    if (p.WithMountingHoles && p.RHole > 0) {
+        var r5CenterR = (p.MHolesPos > 0) ? p.MHolesPos : (derived.r_R4_outer + p.TDiam / 2) / 2;
+        var mhRes = Math.max(24, Math.round(circleRes * p.RHole / (p.TDiam / 2)));
+        for (var mhi = 0; mhi < 3; mhi++) {
+            var mhAngle = mhi * 120 * Math.PI / 180;
+            var mhCx = r5CenterR * Math.cos(mhAngle);
+            var mhCy = r5CenterR * Math.sin(mhAngle);
+            var mhPoly = makeCirclePoly(mhCx, mhCy, p.RHole, mhRes);
+            allHoles.push(ensureCW(mhPoly));
+        }
+    }
+
+    // Handle split mode
+    if (p.Split) {
+        var splitRes = 60;
+        var totalR_val = p.TDiam / 2;
+
+        // Build annular sector outer polygon
+        var annularSector = [];
+        for (var i = 0; i <= splitRes; i++) {
+            var a = deg2rad(-60 + (120 * i / splitRes));
+            annularSector.push([totalR_val * Math.cos(a), totalR_val * Math.sin(a)]);
+        }
+        for (var i = splitRes; i >= 0; i--) {
+            var a = deg2rad(-60 + (120 * i / splitRes));
+            annularSector.push([p.Rh * Math.cos(a), p.Rh * Math.sin(a)]);
+        }
+        outerPoly = ensureCCW(annularSector);
+
+        // Remove central hole; clip remaining holes to sector
+        var clipR = totalR_val + 1;
+        var sectorClip = [[0, 0]];
+        for (var i = 0; i <= splitRes; i++) {
+            var a = deg2rad(-60 + (120 * i / splitRes));
+            sectorClip.push([clipR * Math.cos(a), clipR * Math.sin(a)]);
+        }
+
+        var filteredHoles = [];
+        for (var i = 0; i < allHoles.length; i++) {
+            var hp = allHoles[i];
+            var isCentralHole = true;
+            for (var j = 0; j < hp.length; j++) {
+                var d = Math.sqrt(hp[j][0] * hp[j][0] + hp[j][1] * hp[j][1]);
+                if (Math.abs(d - p.Rh) > 1) { isCentralHole = false; break; }
+            }
+            if (!isCentralHole) {
+                var clipped = sutherlandHodgman(hp, sectorClip);
+                if (clipped && clipped.length >= 3) {
+                    filteredHoles.push(ensureCW(clipped));
+                }
+            }
+        }
+        allHoles = filteredHoles;
+    }
+
+    // Merge ALL holes into outer polygon to create ONE single polygon
+    var merged = mergeHolesIntoPoly(outerPoly, allHoles);
+    merged = ensureCCW(merged);
+
+    // Triangulate the single merged polygon
+    var triangles = earClipTriangulate(merged);
+
+    // Build STL with unit information in the header comment
+    var unitStr = isInches ? 'inches' : 'mm';
+    var dpi = 96;
+    var stl = '';
+    stl += '; Units: ' + unitStr + '\n';
+    stl += '; Scale: 1 unit = 1 ' + unitStr + '\n';
+    stl += '; DPI reference: ' + dpi + '\n';
+    stl += '; Thickness: ' + thickness + ' ' + unitStr + '\n';
+    stl += 'solid 3Bahtinov\n';
+
+    // Helper: write a triangle facet with computed normal
+    function facet(p1, p2, p3) {
+        // Compute face normal
+        var u = [p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]];
+        var v = [p3[0]-p1[0], p3[1]-p1[1], p3[2]-p1[2]];
+        var nx = u[1]*v[2] - u[2]*v[1];
+        var ny = u[2]*v[0] - u[0]*v[2];
+        var nz = u[0]*v[1] - u[1]*v[0];
+        var nl = Math.sqrt(nx*nx + ny*ny + nz*nz);
+        if (nl > 1e-12) { nx/=nl; ny/=nl; nz/=nl; }
+        stl += '  facet normal ' + nx + ' ' + ny + ' ' + nz + '\n';
+        stl += '    outer loop\n';
+        stl += '      vertex ' + p1[0] + ' ' + p1[1] + ' ' + p1[2] + '\n';
+        stl += '      vertex ' + p2[0] + ' ' + p2[1] + ' ' + p2[2] + '\n';
+        stl += '      vertex ' + p3[0] + ' ' + p3[1] + ' ' + p3[2] + '\n';
+        stl += '    endloop\n';
+        stl += '  endfacet\n';
+    }
+
+    // Top face (z = thickness)
+    for (var i = 0; i < triangles.length; i++) {
+        var t = triangles[i];
+        facet([t[0][0], t[0][1], thickness],
+              [t[1][0], t[1][1], thickness],
+              [t[2][0], t[2][1], thickness]);
+    }
+
+    // Bottom face (z = 0, reversed winding)
+    for (var i = 0; i < triangles.length; i++) {
+        var t = triangles[i];
+        facet([t[0][0], t[0][1], 0],
+              [t[2][0], t[2][1], 0],
+              [t[1][0], t[1][1], 0]);
+    }
+
+    // Side walls from the single merged polygon boundary
+    // This ensures all edges (outer + hole bridges) get side walls
+    var n = merged.length;
+    for (var i = 0; i < n; i++) {
+        var p1 = merged[i];
+        var p2 = merged[(i + 1) % n];
+        facet([p1[0], p1[1], 0], [p2[0], p2[1], 0], [p2[0], p2[1], thickness]);
+        facet([p1[0], p1[1], 0], [p2[0], p2[1], thickness], [p1[0], p1[1], thickness]);
+    }
+
+    stl += 'endsolid 3Bahtinov\n';
+    return stl;
+}
+
+function downloadSTL() {
+    var stlContent = generateSTL();
+    var blob = new Blob([stlContent], { type: 'application/sla' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '3Bahtinov_3D_bridge.stl';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// SCANLINE EXACT TRIANGULATION
+// Same boolean logic as grid-based even-odd fill, but with
+// exact polygon edge intersections instead of grid cells.
+// All original polygon vertices are preserved in the output mesh.
+// ============================================================
+function scanlineTriangulate(outer, holes) {
+    // Collect all non-horizontal edges from all polygons
+    var allEdges = [];
+    function addEdges(poly) {
+        for (var i = 0; i < poly.length; i++) {
+            var j = (i + 1) % poly.length;
+            if (Math.abs(poly[i][1] - poly[j][1]) > 1e-10) {
+                allEdges.push([poly[i], poly[j]]);
+            }
+        }
+    }
+    addEdges(outer);
+    for (var h = 0; h < holes.length; h++) addEdges(holes[h]);
+
+    // Collect all unique y-values from polygon vertices
+    var yMap = {};
+    for (var i = 0; i < allEdges.length; i++) {
+        yMap[allEdges[i][0][1].toFixed(10)] = allEdges[i][0][1];
+        yMap[allEdges[i][1][1].toFixed(10)] = allEdges[i][1][1];
+    }
+    var ys = [];
+    for (var k in yMap) ys.push(yMap[k]);
+    ys.sort(function(a, b) { return a - b; });
+
+    // Sweep: for each slab between consecutive y-values
+    var triangles = [];
+    for (var si = 0; si < ys.length - 1; si++) {
+        var yBot = ys[si], yTop = ys[si + 1];
+        if (yTop - yBot < 1e-10) continue;
+        var yMid = (yBot + yTop) / 2;
+
+        // Find all edges active in this slab
+        var active = [];
+        for (var i = 0; i < allEdges.length; i++) {
+            var e = allEdges[i];
+            var eyMin = Math.min(e[0][1], e[1][1]);
+            var eyMax = Math.max(e[0][1], e[1][1]);
+            if (eyMin < yTop - 1e-10 && eyMax > yBot + 1e-10) {
+                var dy = e[1][1] - e[0][1];
+                var dx = e[1][0] - e[0][0];
+                active.push({
+                    xBot: e[0][0] + ((yBot - e[0][1]) / dy) * dx,
+                    xTop: e[0][0] + ((yTop - e[0][1]) / dy) * dx,
+                    xMid: e[0][0] + ((yMid - e[0][1]) / dy) * dx
+                });
+            }
+        }
+
+        // Sort by x at slab midpoint
+        active.sort(function(a, b) { return a.xMid - b.xMid; });
+
+        // Even-odd pairing: edges 0,1 bound first solid span; 2,3 the second; etc.
+        for (var i = 0; i + 1 < active.length; i += 2) {
+            var L = active[i], R = active[i + 1];
+            var bl = [L.xBot, yBot], br = [R.xBot, yBot];
+            var tl = [L.xTop, yTop], tr = [R.xTop, yTop];
+            if (Math.abs(br[0] - bl[0]) < 1e-10 && Math.abs(tr[0] - tl[0]) < 1e-10) continue;
+            triangles.push([bl, br, tr]);
+            triangles.push([bl, tr, tl]);
+        }
+    }
+    return triangles;
+}
+
+// Side walls from a boundary loop (correct normals for both CCW outer and CW holes)
+function scanlineSideWalls(boundary, thickness, facetFn) {
+    for (var i = 0; i < boundary.length; i++) {
+        var a = boundary[i], b = boundary[(i + 1) % boundary.length];
+        facetFn([a[0],a[1],0], [b[0],b[1],0], [b[0],b[1],thickness]);
+        facetFn([a[0],a[1],0], [b[0],b[1],thickness], [a[0],a[1],thickness]);
+    }
+}
+
+// Generate STL using scanline exact triangulation
+function generateSTL_Scanline() {
+    var p = params;
+    var thickness = p.Thickness3D;
+    var circleRes = 120;
+    var isInches = (document.getElementById('units').value === 'inches');
+
+    // Outer boundary (CCW)
+    var outerPoly = makeCirclePoly(0, 0, p.TDiam / 2, circleRes);
+    outerPoly = ensureCCW(outerPoly);
+
+    // Central hole (CW)
+    var holePoly = makeCirclePoly(0, 0, p.Rh, Math.max(36, Math.round(circleRes * p.Rh / (p.TDiam / 2))));
+    holePoly = ensureCW(holePoly);
+
+    // Collect ALL holes
+    var allHoles = [holePoly];
+    for (var i = 0; i < collectedSlits.length; i++) {
+        if (collectedSlits[i].length >= 3) allHoles.push(ensureCW(collectedSlits[i]));
+    }
+    if (p.WithMountingHoles && p.RHole > 0) {
+        var r5CenterR = (p.MHolesPos > 0) ? p.MHolesPos : (derived.r_R4_outer + p.TDiam / 2) / 2;
+        var mhRes = Math.max(24, Math.round(circleRes * p.RHole / (p.TDiam / 2)));
+        for (var mhi = 0; mhi < 3; mhi++) {
+            var mhAngle = mhi * 120 * Math.PI / 180;
+            allHoles.push(ensureCW(makeCirclePoly(
+                r5CenterR * Math.cos(mhAngle), r5CenterR * Math.sin(mhAngle), p.RHole, mhRes)));
+        }
+    }
+
+    // Handle split mode
+    if (p.Split) {
+        var splitRes = 60;
+        var totalR_val = p.TDiam / 2;
+        var annularSector = [];
+        for (var i = 0; i <= splitRes; i++) {
+            var a = deg2rad(-60 + (120 * i / splitRes));
+            annularSector.push([totalR_val * Math.cos(a), totalR_val * Math.sin(a)]);
+        }
+        for (var i = splitRes; i >= 0; i--) {
+            var a = deg2rad(-60 + (120 * i / splitRes));
+            annularSector.push([p.Rh * Math.cos(a), p.Rh * Math.sin(a)]);
+        }
+        outerPoly = ensureCCW(annularSector);
+
+        var clipR = totalR_val + 1;
+        var sectorClip = [[0, 0]];
+        for (var i = 0; i <= splitRes; i++) {
+            var a = deg2rad(-60 + (120 * i / splitRes));
+            sectorClip.push([clipR * Math.cos(a), clipR * Math.sin(a)]);
+        }
+        var filteredHoles = [];
+        for (var i = 0; i < allHoles.length; i++) {
+            var hp = allHoles[i];
+            var isCentralHole = true;
+            for (var j = 0; j < hp.length; j++) {
+                var d = Math.sqrt(hp[j][0] * hp[j][0] + hp[j][1] * hp[j][1]);
+                if (Math.abs(d - p.Rh) > 1) { isCentralHole = false; break; }
+            }
+            if (!isCentralHole) {
+                var clipped = sutherlandHodgman(hp, sectorClip);
+                if (clipped && clipped.length >= 3) filteredHoles.push(ensureCW(clipped));
+            }
+        }
+        allHoles = filteredHoles;
+    }
+
+    // Scanline triangulate (exact polygon intersections, even-odd fill)
+    var triangles = scanlineTriangulate(outerPoly, allHoles);
+
+    // Build STL
+    var unitStr = isInches ? 'inches' : 'mm';
+    var stl = '';
+    stl += '; Units: ' + unitStr + '\n';
+    stl += '; Scale: 1 unit = 1 ' + unitStr + '\n';
+    stl += '; Method: Scanline exact triangulation\n';
+    stl += '; Thickness: ' + thickness + ' ' + unitStr + '\n';
+    stl += 'solid 3Bahtinov\n';
+
+    function facet(p1, p2, p3) {
+        var u = [p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]];
+        var v = [p3[0]-p1[0], p3[1]-p1[1], p3[2]-p1[2]];
+        var nx = u[1]*v[2]-u[2]*v[1], ny = u[2]*v[0]-u[0]*v[2], nz = u[0]*v[1]-u[1]*v[0];
+        var nl = Math.sqrt(nx*nx+ny*ny+nz*nz);
+        if (nl > 1e-12) { nx/=nl; ny/=nl; nz/=nl; }
+        stl += '  facet normal '+nx+' '+ny+' '+nz+'\n';
+        stl += '    outer loop\n';
+        stl += '      vertex '+p1[0]+' '+p1[1]+' '+p1[2]+'\n';
+        stl += '      vertex '+p2[0]+' '+p2[1]+' '+p2[2]+'\n';
+        stl += '      vertex '+p3[0]+' '+p3[1]+' '+p3[2]+'\n';
+        stl += '    endloop\n';
+        stl += '  endfacet\n';
+    }
+
+    // Top face
+    for (var i = 0; i < triangles.length; i++) {
+        var t = triangles[i];
+        facet([t[0][0],t[0][1],thickness], [t[1][0],t[1][1],thickness], [t[2][0],t[2][1],thickness]);
+    }
+    // Bottom face (reversed winding)
+    for (var i = 0; i < triangles.length; i++) {
+        var t = triangles[i];
+        facet([t[0][0],t[0][1],0], [t[2][0],t[2][1],0], [t[1][0],t[1][1],0]);
+    }
+    // Side walls from original boundaries (outer + each hole)
+    scanlineSideWalls(outerPoly, thickness, facet);
+    for (var i = 0; i < allHoles.length; i++) {
+        scanlineSideWalls(allHoles[i], thickness, facet);
+    }
+
+    stl += 'endsolid 3Bahtinov\n';
+    return stl;
+}
+
+function downloadSTL_Scanline() {
+    var stlContent = generateSTL_Scanline();
+    var blob = new Blob([stlContent], { type: 'application/sla' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '3Bahtinov_3D_scanline.stl';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded', function() {
+    initUI();
+    // Compute and set default MHolesPos value
+    updateDerived();
+    var r_R4_out = params.Rh + params.Rth + params.slits_w2 + params.Rth + params.slits_w4;
+    var defaultMHPos = (r_R4_out + params.TDiam / 2) / 2;
+    document.getElementById('mountingHolePos').value = defaultMHPos.toFixed(1);
+    onParamChange();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<!-- TroBahtinov_configurable_Splittable - Release v1.0 | License: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rounding Test - Parallelogram 40°</title>
+<style>
+body { font-family: Arial, sans-serif; background: #eee; padding: 20px; }
+.row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; }
+.cell { background: #fff; border: 1px solid #ccc; padding: 10px; text-align: center; }
+.cell svg { display: block; margin: 0 auto; }
+.cell p { margin: 5px 0 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Rounding Test: Parallelogram with 40° acute angles</h1>
+<p>Parallelogram: base = 220mm, height = 110mm, acute angle = 40°, obtuse angle = 140°.<br>
+Base rounding = TDiam/10 = 22mm. The algorithm should round ALL corners (acute and obtuse).</p>
+
+<h2>Row 1: Clean parallelogram (4 vertices)</h2>
+<div class="row" id="testRowClean"></div>
+
+<h2>Row 2: Parallelogram with bottom edge subdivided into 30 arc segments</h2>
+<p>Simulates a slit clipped to a sector arc. The corners at the arc edge should STILL be rounded properly.</p>
+<div class="row" id="testRowArc"></div>
+
+<script>
+// ============================================================
+// PARALLELOGRAM BUILDERS
+// ============================================================
+function buildParallelogram(cx, cy, base, height, acuteAngleDeg) {
+    var a = acuteAngleDeg * Math.PI / 180;
+    var shear = height / Math.tan(a);
+    var bl = [0, 0], br = [base, 0], tr = [base + shear, height], tl = [shear, height];
+    var midX = (bl[0] + br[0] + tr[0] + tl[0]) / 4;
+    var midY = (bl[1] + br[1] + tr[1] + tl[1]) / 4;
+    return [
+        [bl[0]-midX+cx, bl[1]-midY+cy], [br[0]-midX+cx, br[1]-midY+cy],
+        [tr[0]-midX+cx, tr[1]-midY+cy], [tl[0]-midX+cx, tl[1]-midY+cy]
+    ];
+}
+
+// Bottom edge subdivided into many short segments (simulates arc-clipped slit polygon)
+function buildParallelogramWithArcEdge(cx, cy, base, height, acuteAngleDeg, subdivisions) {
+    var a = acuteAngleDeg * Math.PI / 180;
+    var shear = height / Math.tan(a);
+    var bl = [0, 0], br = [base, 0], tr = [base + shear, height], tl = [shear, height];
+    var midX = (bl[0] + br[0] + tr[0] + tl[0]) / 4;
+    var midY = (bl[1] + br[1] + tr[1] + tl[1]) / 4;
+
+    var poly = [];
+    // BL corner
+    poly.push([bl[0]-midX+cx, bl[1]-midY+cy]);
+    // Subdivide bottom edge (bl -> br) with slight arc curvature (~3mm sag)
+    for (var i = 1; i < subdivisions; i++) {
+        var t = i / subdivisions;
+        var x = bl[0] + t * (br[0] - bl[0]);
+        var y = bl[1] + 3 * Math.sin(t * Math.PI); // slight arc sag
+        poly.push([x-midX+cx, y-midY+cy]);
+    }
+    // BR, TR, TL corners
+    poly.push([br[0]-midX+cx, br[1]-midY+cy]);
+    poly.push([tr[0]-midX+cx, tr[1]-midY+cy]);
+    poly.push([tl[0]-midX+cx, tl[1]-midY+cy]);
+    return poly;
+}
+
+// ============================================================
+// ROUNDING ALGORITHM (arc-segment aware, 3-pass with consumed vertices)
+// ============================================================
+function applyRounding(poly, roundingRadius, arcSegments) {
+    if (roundingRadius <= 0 || !poly || poly.length < 3) return poly;
+    arcSegments = arcSegments || 16;
+
+    var n = poly.length;
+    var COLLINEAR_THRESHOLD = 20 * Math.PI / 180;
+
+    function turningAngle(i) {
+        var prev = poly[(i + n - 1) % n], curr = poly[i], next = poly[(i + 1) % n];
+        var d1x = prev[0]-curr[0], d1y = prev[1]-curr[1];
+        var d2x = next[0]-curr[0], d2y = next[1]-curr[1];
+        var len1 = Math.sqrt(d1x*d1x + d1y*d1y);
+        var len2 = Math.sqrt(d2x*d2x + d2y*d2y);
+        if (len1 < 1e-9 || len2 < 1e-9) return 0;
+        var dot = (d1x*d2x + d1y*d2y) / (len1*len2);
+        dot = Math.max(-1, Math.min(1, dot));
+        return Math.PI - Math.acos(dot);
+    }
+
+    var isSignificant = [];
+    for (var i = 0; i < n; i++) isSignificant.push(Math.abs(turningAngle(i)) > COLLINEAR_THRESHOLD);
+
+    function edgeLen(i) {
+        var j = (i+1)%n;
+        var dx = poly[j][0]-poly[i][0], dy = poly[j][1]-poly[i][1];
+        return Math.sqrt(dx*dx + dy*dy);
+    }
+
+    function accumLenBack(i) {
+        var total = 0, idx = i;
+        for (var s = 0; s < n; s++) {
+            var p = (idx+n-1)%n;
+            total += edgeLen(p);
+            if (isSignificant[p] && p !== i) break;
+            idx = p;
+        }
+        return total;
+    }
+
+    function accumLenFwd(i) {
+        var total = 0, idx = i;
+        for (var s = 0; s < n; s++) {
+            var nx = (idx+1)%n;
+            total += edgeLen(idx);
+            if (isSignificant[nx] && nx !== i) break;
+            idx = nx;
+        }
+        return total;
+    }
+
+    // Pass 1: compute tangentDist for significant vertices
+    var tangentDists = new Array(n);
+    for (var i = 0; i < n; i++) {
+        tangentDists[i] = 0;
+        if (!isSignificant[i]) continue;
+        var prev = poly[(i+n-1)%n], curr = poly[i], next = poly[(i+1)%n];
+        var d1x = prev[0]-curr[0], d1y = prev[1]-curr[1];
+        var d2x = next[0]-curr[0], d2y = next[1]-curr[1];
+        var len1 = Math.sqrt(d1x*d1x+d1y*d1y), len2 = Math.sqrt(d2x*d2x+d2y*d2y);
+        if (len1 < 1e-9 || len2 < 1e-9) continue;
+        var u1x=d1x/len1, u1y=d1y/len1, u2x=d2x/len2, u2y=d2y/len2;
+        var dot = u1x*u2x+u1y*u2y; dot = Math.max(-1, Math.min(1, dot));
+        var halfAngle = Math.acos(dot)/2;
+        if (Math.abs(Math.sin(halfAngle)) < 1e-9) continue;
+        var td = roundingRadius / Math.tan(halfAngle);
+        var maxDist = Math.min(accumLenBack(i)/2, accumLenFwd(i)/2);
+        if (td > maxDist) td = maxDist;
+        tangentDists[i] = td;
+    }
+
+    // Pass 2: mark consumed non-significant vertices
+    var consumed = new Array(n);
+    for (var i = 0; i < n; i++) consumed[i] = false;
+    for (var i = 0; i < n; i++) {
+        if (!isSignificant[i] || tangentDists[i] <= 0) continue;
+        var td = tangentDists[i];
+        var dist = 0, idx = i;
+        for (var s = 0; s < n; s++) {
+            var p = (idx+n-1)%n; dist += edgeLen(p);
+            if (isSignificant[p]) break;
+            if (dist <= td) consumed[p] = true; else break;
+            idx = p;
+        }
+        dist = 0; idx = i;
+        for (var s = 0; s < n; s++) {
+            var nx = (idx+1)%n; dist += edgeLen(idx);
+            if (isSignificant[nx]) break;
+            if (dist <= td) consumed[nx] = true; else break;
+            idx = nx;
+        }
+    }
+
+    // Pass 3: build result
+    var result = [];
+    for (var i = 0; i < n; i++) {
+        if (consumed[i]) continue;
+        if (!isSignificant[i]) { result.push(poly[i]); continue; }
+
+        var prev = poly[(i+n-1)%n], curr = poly[i], next = poly[(i+1)%n];
+        var d1x = prev[0]-curr[0], d1y = prev[1]-curr[1];
+        var d2x = next[0]-curr[0], d2y = next[1]-curr[1];
+        var len1 = Math.sqrt(d1x*d1x+d1y*d1y), len2 = Math.sqrt(d2x*d2x+d2y*d2y);
+        if (len1 < 1e-9 || len2 < 1e-9) { result.push(curr); continue; }
+        var u1x=d1x/len1, u1y=d1y/len1, u2x=d2x/len2, u2y=d2y/len2;
+        var dot = u1x*u2x+u1y*u2y; dot = Math.max(-1, Math.min(1, dot));
+        var halfAngle = Math.acos(dot)/2;
+        if (Math.abs(Math.sin(halfAngle)) < 1e-9) { result.push(curr); continue; }
+
+        var td = tangentDists[i];
+        if (td <= 0) { result.push(curr); continue; }
+        var effectiveR = td * Math.tan(halfAngle);
+
+        var t1x = curr[0]+u1x*td, t1y = curr[1]+u1y*td;
+        var t2x = curr[0]+u2x*td, t2y = curr[1]+u2y*td;
+
+        var bisX = u1x+u2x, bisY = u1y+u2y;
+        var bisLen = Math.sqrt(bisX*bisX+bisY*bisY);
+        if (bisLen < 1e-9) { result.push(curr); continue; }
+        bisX /= bisLen; bisY /= bisLen;
+        var cxF = curr[0] + bisX*(effectiveR/Math.sin(halfAngle));
+        var cyF = curr[1] + bisY*(effectiveR/Math.sin(halfAngle));
+
+        var startAngle = Math.atan2(t1y-cyF, t1x-cxF);
+        var endAngle = Math.atan2(t2y-cyF, t2x-cxF);
+        var cross = u1x*u2y - u1y*u2x;
+        var arcDir = (cross > 0) ? -1 : 1;
+        var sweep = endAngle - startAngle;
+        if (arcDir > 0) { while (sweep<0) sweep+=2*Math.PI; if (sweep>2*Math.PI) sweep-=2*Math.PI; }
+        else { while (sweep>0) sweep-=2*Math.PI; if (sweep<-2*Math.PI) sweep+=2*Math.PI; }
+
+        for (var s = 0; s <= arcSegments; s++) {
+            var t = s/arcSegments;
+            result.push([cxF + effectiveR*Math.cos(startAngle+sweep*t), cyF + effectiveR*Math.sin(startAngle+sweep*t)]);
+        }
+    }
+    return result;
+}
+
+// ============================================================
+// SVG HELPERS
+// ============================================================
+function polygonToSvgPath(poly) {
+    if (!poly || poly.length < 3) return '';
+    var d = 'M' + poly[0][0].toFixed(2) + ',' + poly[0][1].toFixed(2);
+    for (var i = 1; i < poly.length; i++) {
+        d += 'L' + poly[i][0].toFixed(2) + ',' + poly[i][1].toFixed(2);
+    }
+    return d + 'Z';
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderTests() {
+    var base = 220, height = 110, acuteAngle = 40;
+    var baseRounding = 22; // TDiam/10
+    var factors = [0.5, 0.75, 1.0, 2.0];
+
+    renderRow('testRowClean', function() {
+        return buildParallelogram(0, 0, base, height, acuteAngle);
+    }, baseRounding, factors, 'Clean');
+
+    renderRow('testRowArc', function() {
+        return buildParallelogramWithArcEdge(0, 0, base, height, acuteAngle, 30);
+    }, baseRounding, factors, '30-seg arc edge');
+}
+
+function renderRow(containerId, polyBuilder, baseRounding, factors, rowLabel) {
+    var container = document.getElementById(containerId);
+
+    for (var fi = 0; fi < factors.length; fi++) {
+        var factor = factors[fi];
+        var radius = factor * baseRounding;
+
+        var para = polyBuilder();
+        var rounded = applyRounding(para, radius, 20);
+
+        // Compute bounds for viewBox
+        var allPts = para.concat(rounded);
+        var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (var v = 0; v < allPts.length; v++) {
+            if (allPts[v][0] < minX) minX = allPts[v][0];
+            if (allPts[v][0] > maxX) maxX = allPts[v][0];
+            if (allPts[v][1] < minY) minY = allPts[v][1];
+            if (allPts[v][1] > maxY) maxY = allPts[v][1];
+        }
+        var margin = 20;
+        var w = (maxX-minX) + margin*2, h2 = (maxY-minY) + margin*2;
+        var scale = Math.max(w, h2);
+
+        var svgNS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', '300');
+        svg.setAttribute('height', '200');
+        svg.setAttribute('viewBox', (-scale/2)+' '+(-scale/2)+' '+scale+' '+scale);
+
+        var bg = document.createElementNS(svgNS, 'rect');
+        bg.setAttribute('x', -scale/2); bg.setAttribute('y', -scale/2);
+        bg.setAttribute('width', scale); bg.setAttribute('height', scale);
+        bg.setAttribute('fill', '#f8f8f8');
+        svg.appendChild(bg);
+
+        // Original shape (dashed)
+        var origEl = document.createElementNS(svgNS, 'path');
+        origEl.setAttribute('d', polygonToSvgPath(para));
+        origEl.setAttribute('fill', 'none');
+        origEl.setAttribute('stroke', '#aaa');
+        origEl.setAttribute('stroke-width', '1');
+        origEl.setAttribute('stroke-dasharray', '4,3');
+        svg.appendChild(origEl);
+
+        // Rounded shape (filled)
+        var roundEl = document.createElementNS(svgNS, 'path');
+        roundEl.setAttribute('d', polygonToSvgPath(rounded));
+        roundEl.setAttribute('fill', 'rgba(50,120,200,0.25)');
+        roundEl.setAttribute('stroke', '#2060c0');
+        roundEl.setAttribute('stroke-width', '1.2');
+        svg.appendChild(roundEl);
+
+        // Mark original corners with red dots
+        for (var c = 0; c < para.length; c++) {
+            var dot = document.createElementNS(svgNS, 'circle');
+            dot.setAttribute('cx', para[c][0]); dot.setAttribute('cy', para[c][1]);
+            dot.setAttribute('r', '2'); dot.setAttribute('fill', 'red');
+            svg.appendChild(dot);
+        }
+
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.appendChild(svg);
+        var lbl = document.createElement('p');
+        lbl.textContent = rowLabel + ' | F=' + factor + ' | R=' + radius.toFixed(1) + 'mm';
+        cell.appendChild(lbl);
+        container.appendChild(cell);
+    }
+}
+
+renderTests();
+</script>
+</body>
+</html>

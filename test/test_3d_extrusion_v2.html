@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<!-- TroBahtinov_configurable_Splittable - Release v1.0 | License: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D Extrusion Test v2 – Refined Methods</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; max-width: 1100px; margin: 0 auto; }
+h1 { font-size: 20px; }
+h2 { font-size: 16px; margin-top: 24px; border-top: 1px solid #ccc; padding-top: 12px; }
+.desc { font-size: 13px; color: #555; margin-bottom: 8px; }
+button { padding: 6px 14px; margin: 4px 4px 4px 0; cursor: pointer; }
+canvas { border: 1px solid #ccc; display: block; margin: 8px 0; }
+.method { background: #f9f9f9; border: 1px solid #ddd; padding: 12px; margin-bottom: 16px; border-radius: 4px; }
+.analysis { background: #fffff0; border: 1px solid #cc9; padding: 12px; margin: 16px 0; border-radius: 4px; font-size: 13px; line-height: 1.5; }
+table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+td, th { border: 1px solid #ccc; padding: 4px 8px; }
+th { background: #eee; }
+.ok { color: green; font-weight: bold; }
+.bad { color: red; }
+.warn { color: #c80; }
+.stats { font-size: 12px; color: #666; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>3D Extrusion Test v2 – Refined Methods</h1>
+<p class="desc">
+Test shape: circular disk (R=50) with a rectangular hole (40&times;10) and a circular hole (R=8 at 25,25). Thickness=3.<br>
+Focused on fixing Method 4's boundary resolution while keeping its correct boolean logic.
+</p>
+
+<canvas id="shapeCanvas" width="300" height="300"></canvas>
+
+<div class="analysis">
+<strong>Analysis of v1 Methods – Why They Failed:</strong>
+<table>
+<tr><th>Method</th><th>Approach</th><th>Failure Root Cause</th></tr>
+<tr><td>1, 5, 6</td><td>Bridge-edge merge</td><td class="bad">Bridge corridors create degenerate seams / non-manifold geometry</td></tr>
+<tr><td>2</td><td>Bridge faces + separate walls</td><td class="bad">Bug: used sideWallsReversed() for CW holes → inverted normals on hole walls</td></tr>
+<tr><td>3</td><td>Radial fan from centroid</td><td class="bad">Fan only works for star-shaped/convex regions; fails with holes</td></tr>
+<tr><td>4</td><td>Grid boolean (even-odd)</td><td class="warn">Correct topology, but all curves → 90° staircase artifacts</td></tr>
+<tr><td>7</td><td>Separate inverted-normal solids</td><td class="bad">Not manifold; STL has no boolean subtraction</td></tr>
+</table>
+<p>
+<strong>Key insight:</strong> Method 4's boolean logic (even-odd fill) is topologically correct.
+The fix: replace grid cells with <em>exact polygon edge intersections</em> → <strong>Scanline Exact Triangulation</strong>.
+</p>
+<p>
+<strong>Side wall normal bug found:</strong> <code>sideWalls()</code> already produces correct outward-facing normals
+for <em>both</em> CCW outer boundaries and CW hole boundaries. Methods 2 &amp; 6 incorrectly used
+<code>sideWallsReversed()</code> for holes, inverting their normals.
+</p>
+</div>
+
+<div class="method">
+<h2>Method A: Scanline Exact Triangulation ★ (Recommended)</h2>
+<p class="desc">
+Same boolean logic as grid Method 4 (even-odd fill rule), but uses exact polygon edge
+intersections instead of grid cells. All original polygon vertices are preserved in the output mesh.
+Boundaries are exact polygons, not staircase approximations.<br>
+<strong>Algorithm:</strong> Collect all vertex y-values → define horizontal slabs. In each slab,
+compute exact x-intersections of all active edges. Sort by x, pair by even-odd rule →
+solid spans become trapezoids (2 triangles each). Side walls from original boundary loops.
+</p>
+<button onclick="downloadSTL('A')">Download STL – Method A</button>
+<div class="stats" id="statsA"></div>
+</div>
+
+<div class="method">
+<h2>Method B: Scanline Adaptive (Refined A)</h2>
+<p class="desc">
+Same as Method A but subdivides tall slabs (height &gt; 3mm) into smaller strips.
+This avoids very elongated thin triangles and improves mesh quality for slicers.
+Boundary geometry is still exact (subdivided edges are linear interpolations of the same polygon edges).
+</p>
+<button onclick="downloadSTL('B')">Download STL – Method B</button>
+<div class="stats" id="statsB"></div>
+</div>
+
+<div class="method">
+<h2>Method C: Bridge Merge + Fixed Normals</h2>
+<p class="desc">
+Same bridge-edge merge as v1 Method 1 for face triangulation, but with <strong>corrected side walls</strong>:
+uses <code>sideWalls()</code> for both outer and holes (fixing the normal inversion bug).
+This tests whether the bridge approach works once normals are correct, or if bridge seams
+are inherently problematic.
+</p>
+<button onclick="downloadSTL('C')">Download STL – Method C</button>
+<div class="stats" id="statsC"></div>
+</div>
+
+<div class="method">
+<h2>Method D: Bridge Merge + Epsilon Offset + Fixed Normals</h2>
+<p class="desc">
+Bridge-edge merge with epsilon-width corridors (0.01 mm) instead of zero-width.
+This avoids degenerate zero-area triangles. Combined with fixed normals.
+Tests whether epsilon bridges solve the manifold issue.
+</p>
+<button onclick="downloadSTL('D')">Download STL – Method D</button>
+<div class="stats" id="statsD"></div>
+</div>
+
+<div class="method">
+<h2>Method E: Fine Grid Boolean (0.25mm)</h2>
+<p class="desc">
+Same as v1 Method 4 but with 4× finer grid (0.25mm cells instead of 1mm).
+For comparison: shows that even at higher resolution, staircase artifacts persist.
+File is much larger. Demonstrates why the scanline approach is fundamentally better.
+</p>
+<button onclick="downloadSTL('E')">Download STL – Method E</button>
+<div class="stats" id="statsE"></div>
+</div>
+
+<script>
+// ============================================================
+// SHARED GEOMETRY
+// ============================================================
+var THICKNESS = 3;
+var OUTER_R = 50;
+var RECT_W = 40, RECT_H = 10;
+var CIRCLE_HOLE_R = 8, CIRCLE_HOLE_CX = 25, CIRCLE_HOLE_CY = 25;
+var CIRCLE_RES = 72;
+
+function makeCirclePoly(cx, cy, r, n) {
+    var poly = [];
+    for (var i = 0; i < n; i++) {
+        var a = 2 * Math.PI * i / n;
+        poly.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return poly;
+}
+function makeRectPoly(cx, cy, w, h) {
+    var hw = w/2, hh = h/2;
+    return [[cx-hw, cy-hh], [cx+hw, cy-hh], [cx+hw, cy+hh], [cx-hw, cy+hh]];
+}
+function polyArea(poly) {
+    var a = 0;
+    for (var i = 0; i < poly.length; i++) {
+        var j = (i+1) % poly.length;
+        a += poly[i][0]*poly[j][1] - poly[j][0]*poly[i][1];
+    }
+    return a/2;
+}
+function ensureCCW(p) { return polyArea(p) >= 0 ? p : p.slice().reverse(); }
+function ensureCW(p)  { return polyArea(p) <= 0 ? p : p.slice().reverse(); }
+function getOuter() { return ensureCCW(makeCirclePoly(0, 0, OUTER_R, CIRCLE_RES)); }
+function getHoles() {
+    return [
+        ensureCW(makeRectPoly(0, 0, RECT_W, RECT_H)),
+        ensureCW(makeCirclePoly(CIRCLE_HOLE_CX, CIRCLE_HOLE_CY, CIRCLE_HOLE_R, 36))
+    ];
+}
+
+// ============================================================
+// PREVIEW
+// ============================================================
+(function drawPreview() {
+    var c = document.getElementById('shapeCanvas');
+    if (!c) return;
+    var ctx = c.getContext('2d');
+    var w = c.width, h = c.height, scale = 2.5, ox = w/2, oy = h/2;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+    ctx.beginPath(); ctx.arc(ox, oy, OUTER_R*scale, 0, 2*Math.PI);
+    ctx.fillStyle = '#333'; ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(ox - RECT_W/2*scale, oy - RECT_H/2*scale, RECT_W*scale, RECT_H*scale);
+    ctx.beginPath(); ctx.arc(ox + CIRCLE_HOLE_CX*scale, oy - CIRCLE_HOLE_CY*scale, CIRCLE_HOLE_R*scale, 0, 2*Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = '#999'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.arc(ox, oy, OUTER_R*scale, 0, 2*Math.PI); ctx.stroke();
+})();
+
+// ============================================================
+// STL HELPERS
+// ============================================================
+function stlFacet(p1, p2, p3) {
+    var u = [p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]];
+    var v = [p3[0]-p1[0], p3[1]-p1[1], p3[2]-p1[2]];
+    var nx = u[1]*v[2]-u[2]*v[1], ny = u[2]*v[0]-u[0]*v[2], nz = u[0]*v[1]-u[1]*v[0];
+    var nl = Math.sqrt(nx*nx+ny*ny+nz*nz);
+    if (nl > 1e-12) { nx /= nl; ny /= nl; nz /= nl; }
+    return '  facet normal '+nx+' '+ny+' '+nz+'\n    outer loop\n'+
+        '      vertex '+p1[0]+' '+p1[1]+' '+p1[2]+'\n'+
+        '      vertex '+p2[0]+' '+p2[1]+' '+p2[2]+'\n'+
+        '      vertex '+p3[0]+' '+p3[1]+' '+p3[2]+'\n'+
+        '    endloop\n  endfacet\n';
+}
+
+// Side walls for a boundary loop.
+// Produces outward-facing normals for BOTH:
+//   - CCW outer boundary (normals point away from interior)
+//   - CW hole boundary  (normals point into the hole, away from the solid)
+function sideWalls(boundary, thickness) {
+    var s = '';
+    var n = boundary.length;
+    for (var i = 0; i < n; i++) {
+        var a = boundary[i], b = boundary[(i+1)%n];
+        s += stlFacet([a[0],a[1],0], [b[0],b[1],0], [b[0],b[1],thickness]);
+        s += stlFacet([a[0],a[1],0], [b[0],b[1],thickness], [a[0],a[1],thickness]);
+    }
+    return s;
+}
+
+// ============================================================
+// SCANLINE EXACT TRIANGULATION
+// Core algorithm: horizontal sweep with even-odd fill rule.
+// Same boolean logic as the grid approach, but with exact
+// polygon edge intersections instead of grid cells.
+// ============================================================
+function scanlineTriangulate(outer, holes, maxSlabHeight) {
+    // Collect all non-horizontal edges from all polygons
+    var allEdges = [];
+    function addEdges(poly) {
+        for (var i = 0; i < poly.length; i++) {
+            var j = (i + 1) % poly.length;
+            if (Math.abs(poly[i][1] - poly[j][1]) > 1e-10) {
+                allEdges.push([poly[i], poly[j]]);
+            }
+        }
+    }
+    addEdges(outer);
+    for (var h = 0; h < holes.length; h++) addEdges(holes[h]);
+
+    // Collect all unique y-values from polygon vertices
+    var yMap = {};
+    for (var i = 0; i < allEdges.length; i++) {
+        yMap[allEdges[i][0][1].toFixed(10)] = allEdges[i][0][1];
+        yMap[allEdges[i][1][1].toFixed(10)] = allEdges[i][1][1];
+    }
+    var ys = [];
+    for (var k in yMap) ys.push(yMap[k]);
+    ys.sort(function(a, b) { return a - b; });
+
+    // Optional: subdivide tall slabs for better triangle quality
+    if (maxSlabHeight && maxSlabHeight > 0) {
+        var refined = [];
+        for (var i = 0; i < ys.length; i++) {
+            refined.push(ys[i]);
+            if (i < ys.length - 1) {
+                var gap = ys[i + 1] - ys[i];
+                if (gap > maxSlabHeight) {
+                    var nSub = Math.ceil(gap / maxSlabHeight);
+                    for (var s = 1; s < nSub; s++) {
+                        refined.push(ys[i] + gap * s / nSub);
+                    }
+                }
+            }
+        }
+        ys = refined;
+    }
+
+    // Sweep: for each slab between consecutive y-values
+    var triangles = [];
+    for (var si = 0; si < ys.length - 1; si++) {
+        var yBot = ys[si], yTop = ys[si + 1];
+        if (yTop - yBot < 1e-10) continue;
+        var yMid = (yBot + yTop) / 2;
+
+        // Find all edges active in this slab
+        // An edge is active if its y-range strictly overlaps [yBot, yTop]
+        var active = [];
+        for (var i = 0; i < allEdges.length; i++) {
+            var e = allEdges[i];
+            var eyMin = Math.min(e[0][1], e[1][1]);
+            var eyMax = Math.max(e[0][1], e[1][1]);
+            if (eyMin < yTop - 1e-10 && eyMax > yBot + 1e-10) {
+                var dy = e[1][1] - e[0][1];
+                var dx = e[1][0] - e[0][0];
+                active.push({
+                    xBot: e[0][0] + ((yBot - e[0][1]) / dy) * dx,
+                    xTop: e[0][0] + ((yTop - e[0][1]) / dy) * dx,
+                    xMid: e[0][0] + ((yMid - e[0][1]) / dy) * dx
+                });
+            }
+        }
+
+        // Sort by x at slab midpoint (stable ordering within slab)
+        active.sort(function(a, b) { return a.xMid - b.xMid; });
+
+        // Even-odd pairing: edges 0,1 bound first solid span; 2,3 the second; etc.
+        for (var i = 0; i + 1 < active.length; i += 2) {
+            var L = active[i], R = active[i + 1];
+            var bl = [L.xBot, yBot], br = [R.xBot, yBot];
+            var tl = [L.xTop, yTop], tr = [R.xTop, yTop];
+
+            // Skip fully degenerate trapezoids (zero width at both levels)
+            if (Math.abs(br[0] - bl[0]) < 1e-10 && Math.abs(tr[0] - tl[0]) < 1e-10) continue;
+
+            // Two triangles per trapezoid
+            triangles.push([bl, br, tr]);
+            triangles.push([bl, tr, tl]);
+        }
+    }
+
+    return triangles;
+}
+
+// ============================================================
+// EAR-CLIP TRIANGULATION (for bridge merge methods)
+// ============================================================
+function earClip(poly) {
+    if (poly.length < 3) return [];
+    if (poly.length === 3) return [[poly[0], poly[1], poly[2]]];
+    var verts = poly.map(function(p) { return {x:p[0], y:p[1]}; });
+    var tris = [];
+    function cross2(o,a,b) { return (a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x); }
+    function inTri(p,a,b,c) {
+        var d1=cross2(a,b,p), d2=cross2(b,c,p), d3=cross2(c,a,p);
+        return !((d1<0||d2<0||d3<0)&&(d1>0||d2>0||d3>0));
+    }
+    function isEar(i) {
+        var n=verts.length;
+        var prev=verts[(i+n-1)%n], curr=verts[i], next=verts[(i+1)%n];
+        if (cross2(prev, curr, next) <= 0) return false;
+        for (var j=0; j<n; j++) {
+            if (j===(i+n-1)%n||j===i||j===(i+1)%n) continue;
+            if (inTri(verts[j], prev, curr, next)) return false;
+        }
+        return true;
+    }
+    var maxIter = verts.length * verts.length, iter = 0;
+    while (verts.length > 3 && iter < maxIter) {
+        var found = false;
+        for (var i = 0; i < verts.length; i++) {
+            if (isEar(i)) {
+                var n = verts.length;
+                var prev=verts[(i+n-1)%n], curr=verts[i], next=verts[(i+1)%n];
+                tris.push([[prev.x,prev.y],[curr.x,curr.y],[next.x,next.y]]);
+                verts.splice(i, 1);
+                found = true; break;
+            }
+        }
+        if (!found) break;
+        iter++;
+    }
+    if (verts.length === 3) {
+        tris.push([[verts[0].x,verts[0].y],[verts[1].x,verts[1].y],[verts[2].x,verts[2].y]]);
+    }
+    return tris;
+}
+
+// ============================================================
+// BRIDGE-EDGE MERGE
+// ============================================================
+function mergeHoles(outer, holes) {
+    if (!holes || holes.length === 0) return outer.slice();
+    var result = outer.slice();
+    var sorted = holes.map(function(h) {
+        var mx = -Infinity, mi = 0;
+        for (var i = 0; i < h.length; i++) if (h[i][0] > mx) { mx = h[i][0]; mi = i; }
+        return {poly:h, maxX:mx, maxIdx:mi};
+    }).sort(function(a,b) { return b.maxX - a.maxX; });
+
+    for (var hi = 0; hi < sorted.length; hi++) {
+        var hole = sorted[hi];
+        var hp = hole.poly[hole.maxIdx];
+        var bestD = Infinity, bestI = 0;
+        for (var i = 0; i < result.length; i++) {
+            var dx = result[i][0]-hp[0], dy = result[i][1]-hp[1];
+            if (dx*dx+dy*dy < bestD) { bestD = dx*dx+dy*dy; bestI = i; }
+        }
+        var np = [];
+        for (var i = 0; i <= bestI; i++) np.push(result[i]);
+        for (var i = 0; i <= hole.poly.length; i++) np.push(hole.poly[(hole.maxIdx+i)%hole.poly.length]);
+        for (var i = bestI; i < result.length; i++) np.push(result[i]);
+        result = np;
+    }
+    return result;
+}
+
+// Bridge merge with epsilon-width corridors
+function mergeHolesEpsilon(outer, holes, eps) {
+    if (!holes || holes.length === 0) return outer.slice();
+    var result = outer.slice();
+    var sorted = holes.map(function(h) {
+        var mx = -Infinity, mi = 0;
+        for (var i = 0; i < h.length; i++) if (h[i][0] > mx) { mx = h[i][0]; mi = i; }
+        return {poly:h, maxX:mx, maxIdx:mi};
+    }).sort(function(a,b) { return b.maxX - a.maxX; });
+
+    for (var hi = 0; hi < sorted.length; hi++) {
+        var hole = sorted[hi];
+        var hp = hole.poly[hole.maxIdx];
+        var bestD = Infinity, bestI = 0;
+        for (var i = 0; i < result.length; i++) {
+            var dx = result[i][0]-hp[0], dy = result[i][1]-hp[1];
+            if (dx*dx+dy*dy < bestD) { bestD = dx*dx+dy*dy; bestI = i; }
+        }
+        var op = result[bestI];
+        var dx = hp[0]-op[0], dy = hp[1]-op[1];
+        var len = Math.sqrt(dx*dx+dy*dy);
+        var perpX = 0, perpY = 0;
+        if (len > 1e-9) { perpX = -dy/len*eps; perpY = dx/len*eps; }
+
+        var np = [];
+        for (var i = 0; i <= bestI; i++) np.push(result[i]);
+        np.push([op[0]+perpX, op[1]+perpY]);
+        np.push([hp[0]+perpX, hp[1]+perpY]);
+        for (var i = 0; i <= hole.poly.length; i++) np.push(hole.poly[(hole.maxIdx+i)%hole.poly.length]);
+        np.push([hp[0]-perpX, hp[1]-perpY]);
+        np.push([op[0]-perpX, op[1]-perpY]);
+        for (var i = bestI; i < result.length; i++) np.push(result[i]);
+        result = np;
+    }
+    return result;
+}
+
+// ============================================================
+// POINT-IN-POLYGON (for grid method)
+// ============================================================
+function pointInPoly(pt, poly) {
+    var x = pt[0], y = pt[1], inside = false;
+    for (var i = 0, j = poly.length-1; i < poly.length; j = i++) {
+        var xi=poly[i][0], yi=poly[i][1], xj=poly[j][0], yj=poly[j][1];
+        if ((yi>y) !== (yj>y) && x < (xj-xi)*(y-yi)/(yj-yi)+xi) inside = !inside;
+    }
+    return inside;
+}
+
+// ============================================================
+// METHOD IMPLEMENTATIONS
+// ============================================================
+
+// Method A: Scanline Exact
+function generateMethodA() {
+    var outer = getOuter(), holes = getHoles();
+    var tris = scanlineTriangulate(outer, holes, 0); // no slab subdivision
+
+    var stl = 'solid MethodA_ScanlineExact\n';
+    // Top face (z = thickness, CCW winding → normal up)
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],THICKNESS], [t[1][0],t[1][1],THICKNESS], [t[2][0],t[2][1],THICKNESS]);
+    }
+    // Bottom face (z = 0, reversed winding → normal down)
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],0], [t[2][0],t[2][1],0], [t[1][0],t[1][1],0]);
+    }
+    // Side walls from original boundaries
+    stl += sideWalls(outer, THICKNESS);
+    for (var h = 0; h < holes.length; h++) stl += sideWalls(holes[h], THICKNESS);
+    stl += 'endsolid MethodA_ScanlineExact\n';
+    return { stl: stl, faceTris: tris.length };
+}
+
+// Method B: Scanline Adaptive (subdivide slabs > 3mm)
+function generateMethodB() {
+    var outer = getOuter(), holes = getHoles();
+    var tris = scanlineTriangulate(outer, holes, 3.0); // max 3mm slab height
+
+    var stl = 'solid MethodB_ScanlineAdaptive\n';
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],THICKNESS], [t[1][0],t[1][1],THICKNESS], [t[2][0],t[2][1],THICKNESS]);
+    }
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],0], [t[2][0],t[2][1],0], [t[1][0],t[1][1],0]);
+    }
+    stl += sideWalls(outer, THICKNESS);
+    for (var h = 0; h < holes.length; h++) stl += sideWalls(holes[h], THICKNESS);
+    stl += 'endsolid MethodB_ScanlineAdaptive\n';
+    return { stl: stl, faceTris: tris.length };
+}
+
+// Method C: Bridge merge (zero-width) + fixed side walls
+function generateMethodC() {
+    var outer = getOuter(), holes = getHoles();
+    var merged = ensureCCW(mergeHoles(outer, holes));
+    var tris = earClip(merged);
+
+    var stl = 'solid MethodC_BridgeMergeFixed\n';
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],THICKNESS], [t[1][0],t[1][1],THICKNESS], [t[2][0],t[2][1],THICKNESS]);
+    }
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],0], [t[2][0],t[2][1],0], [t[1][0],t[1][1],0]);
+    }
+    // FIXED: use sideWalls() for BOTH outer and holes (not sideWallsReversed for holes)
+    stl += sideWalls(outer, THICKNESS);
+    for (var h = 0; h < holes.length; h++) stl += sideWalls(holes[h], THICKNESS);
+    stl += 'endsolid MethodC_BridgeMergeFixed\n';
+    return { stl: stl, faceTris: tris.length };
+}
+
+// Method D: Bridge merge with epsilon + fixed side walls
+function generateMethodD() {
+    var outer = getOuter(), holes = getHoles();
+    var merged = ensureCCW(mergeHolesEpsilon(outer, holes, 0.01));
+    var tris = earClip(merged);
+
+    var stl = 'solid MethodD_BridgeEpsilonFixed\n';
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],THICKNESS], [t[1][0],t[1][1],THICKNESS], [t[2][0],t[2][1],THICKNESS]);
+    }
+    for (var i = 0; i < tris.length; i++) {
+        var t = tris[i];
+        stl += stlFacet([t[0][0],t[0][1],0], [t[2][0],t[2][1],0], [t[1][0],t[1][1],0]);
+    }
+    stl += sideWalls(outer, THICKNESS);
+    for (var h = 0; h < holes.length; h++) stl += sideWalls(holes[h], THICKNESS);
+    stl += 'endsolid MethodD_BridgeEpsilonFixed\n';
+    return { stl: stl, faceTris: tris.length };
+}
+
+// Method E: Fine grid boolean (0.25mm)
+function generateMethodE() {
+    var outer = getOuter(), holes = getHoles();
+    var stl = 'solid MethodE_FineGrid\n';
+    var gridRes = 0.25;
+    var minX = -OUTER_R-1, maxX = OUTER_R+1, minY = -OUTER_R-1, maxY = OUTER_R+1;
+    var nx = Math.ceil((maxX-minX)/gridRes);
+    var ny = Math.ceil((maxY-minY)/gridRes);
+    var faceTris = 0;
+
+    // Build grid
+    var grid = [];
+    for (var ix = 0; ix < nx; ix++) {
+        grid[ix] = [];
+        for (var iy = 0; iy < ny; iy++) {
+            var cx = minX+(ix+0.5)*gridRes, cy = minY+(iy+0.5)*gridRes;
+            var inside = pointInPoly([cx,cy], outer);
+            if (inside) {
+                for (var h = 0; h < holes.length; h++) {
+                    if (pointInPoly([cx,cy], holes[h].slice().reverse())) { inside = false; break; }
+                }
+            }
+            grid[ix][iy] = inside;
+        }
+    }
+
+    for (var ix = 0; ix < nx; ix++) {
+        for (var iy = 0; iy < ny; iy++) {
+            if (!grid[ix][iy]) continue;
+            var x0=minX+ix*gridRes, x1=x0+gridRes, y0=minY+iy*gridRes, y1=y0+gridRes;
+            stl += stlFacet([x0,y0,THICKNESS],[x1,y0,THICKNESS],[x1,y1,THICKNESS]);
+            stl += stlFacet([x0,y0,THICKNESS],[x1,y1,THICKNESS],[x0,y1,THICKNESS]);
+            stl += stlFacet([x0,y0,0],[x1,y1,0],[x1,y0,0]);
+            stl += stlFacet([x0,y0,0],[x0,y1,0],[x1,y1,0]);
+            faceTris += 4;
+            if (ix===0||!grid[ix-1][iy]) {
+                stl += stlFacet([x0,y0,0],[x0,y0,THICKNESS],[x0,y1,THICKNESS]);
+                stl += stlFacet([x0,y0,0],[x0,y1,THICKNESS],[x0,y1,0]);
+            }
+            if (ix===nx-1||!grid[ix+1][iy]) {
+                stl += stlFacet([x1,y0,0],[x1,y1,THICKNESS],[x1,y0,THICKNESS]);
+                stl += stlFacet([x1,y0,0],[x1,y1,0],[x1,y1,THICKNESS]);
+            }
+            if (iy===0||!grid[ix][iy-1]) {
+                stl += stlFacet([x0,y0,0],[x1,y0,THICKNESS],[x1,y0,0]);
+                stl += stlFacet([x0,y0,0],[x0,y0,THICKNESS],[x1,y0,THICKNESS]);
+            }
+            if (iy===ny-1||!grid[ix][iy+1]) {
+                stl += stlFacet([x0,y1,0],[x1,y1,0],[x1,y1,THICKNESS]);
+                stl += stlFacet([x0,y1,0],[x1,y1,THICKNESS],[x0,y1,THICKNESS]);
+            }
+        }
+    }
+
+    stl += 'endsolid MethodE_FineGrid\n';
+    return { stl: stl, faceTris: faceTris };
+}
+
+// ============================================================
+// DOWNLOAD
+// ============================================================
+function downloadSTL(method) {
+    var generators = {
+        'A': generateMethodA,
+        'B': generateMethodB,
+        'C': generateMethodC,
+        'D': generateMethodD,
+        'E': generateMethodE
+    };
+    var gen = generators[method];
+    if (!gen) { alert('Unknown method'); return; }
+
+    var t0 = performance.now();
+    var result = gen();
+    var elapsed = (performance.now() - t0).toFixed(0);
+    var stl = result.stl;
+    var sizeKB = (stl.length / 1024).toFixed(1);
+    var totalFacets = (stl.match(/facet normal/g) || []).length;
+
+    document.getElementById('stats' + method).textContent =
+        'Generated: ' + totalFacets + ' triangles, ' + sizeKB + ' KB, ' + elapsed + ' ms';
+
+    var blob = new Blob([stl], {type:'application/sla'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '3D_test_v2_method' + method + '.stl';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

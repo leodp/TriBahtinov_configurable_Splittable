@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<!-- TroBahtinov_configurable_Splittable - Release v1.0 | License: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Test: 3 ways to cut a slit from a mask</title>
+<style>
+body { font-family: Arial, sans-serif; background: #D8D8D8; padding: 20px; }
+h2 { margin-top: 30px; }
+p { max-width: 700px; font-size: 13px; color: #333; }
+.row { display: flex; gap: 40px; flex-wrap: wrap; }
+.col { text-align: center; }
+svg { border: 1px solid #999; background: #D8D8D8; }
+</style>
+</head>
+<body>
+<h1>Test: 3 methods for cutting a slit hole from a solid mask</h1>
+<p>Each column shows the same mask (solid black circle, central hole, one slit).
+The slit is a tilted rectangle clipped to an annular sector.
+The 3 methods differ in how the slit is subtracted from the mask in SVG.</p>
+
+<div class="row">
+<div class="col" id="m1"></div>
+<div class="col" id="m2"></div>
+<div class="col" id="m3"></div>
+</div>
+
+<script>
+var NS = 'http://www.w3.org/2000/svg';
+
+// Mask parameters
+var totalR = 110, holeR = 15, rInner = 20, rOuter = 65;
+var tiltDeg = 15, slitW = 5;
+
+function el(tag, attrs) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+}
+
+function circlePath(cx, cy, r) {
+    return 'M'+(cx-r)+','+cy+'A'+r+','+r+' 0 1,0 '+(cx+r)+','+cy+
+           'A'+r+','+r+' 0 1,0 '+(cx-r)+','+cy+'Z';
+}
+
+// Build a sample slit polygon (tilted rectangle clipped to sector)
+function buildSlit() {
+    var tilt = tiltDeg * Math.PI / 180;
+    var ax = Math.cos(tilt), ay = Math.sin(tilt);
+    var px = -ay, py = ax;
+    var offset = 30; // perpendicular offset
+    var cx = offset * px, cy = offset * py;
+    var hl = 200, hw = slitW / 2;
+    var rect = [
+        [cx - hl*ax - hw*px, cy - hl*ay - hw*py],
+        [cx + hl*ax - hw*px, cy + hl*ay - hw*py],
+        [cx + hl*ax + hw*px, cy + hl*ay + hw*py],
+        [cx - hl*ax + hw*px, cy - hl*ay + hw*py]
+    ];
+    // Clip to annular sector (simple: clip to inner/outer circles by keeping points inside)
+    // For simplicity, just use the rectangle as-is (oversized, but demonstrates the principle)
+    return rect;
+}
+
+var slit = buildSlit();
+var slitD = 'M'+slit[0][0]+','+(-slit[0][1]);
+for (var i=1;i<slit.length;i++) slitD+='L'+slit[i][0]+','+(-slit[i][1]);
+slitD += 'Z';
+
+// ================================================================
+// METHOD 1: COMPOUND PATH with fill-rule="evenodd"
+// The mask outer circle, central hole, and slit are all subpaths
+// of one <path> element. evenodd toggles fill for each crossing.
+// This is the CORRECT approach: slit IS a hole in the mask.
+// ================================================================
+(function() {
+    var svg = el('svg', {width:250, height:250, viewBox:'-130 -130 260 260'});
+    var title = document.createElement('h2');
+    title.textContent = 'Method 1: Compound path + evenodd';
+    var desc = document.createElement('p');
+    desc.textContent = 'All shapes (outer disk, central hole, slit) are subpaths of ONE <path>. ' +
+        'fill-rule="evenodd" makes each enclosed region alternate between filled and empty. ' +
+        'The slit is a true hole. This is the current implementation.';
+    
+    var pathD = circlePath(0,0,totalR) + circlePath(0,0,holeR) + slitD;
+    svg.appendChild(el('path', {d: pathD, fill:'#000', stroke:'none', 'fill-rule':'evenodd'}));
+    // Colored slit edge overlay
+    svg.appendChild(el('path', {d: slitD, fill:'none', stroke:'#FF0000', 'stroke-width':'0.5'}));
+    
+    document.getElementById('m1').appendChild(title);
+    document.getElementById('m1').appendChild(desc);
+    document.getElementById('m1').appendChild(svg);
+})();
+
+// ================================================================
+// METHOD 2: clipPath approach
+// The mask is a filled circle. A clipPath EXCLUDES the slit area.
+// This uses a clipPath with fill-rule="evenodd" to define the visible region.
+// ================================================================
+(function() {
+    var svg = el('svg', {width:250, height:250, viewBox:'-130 -130 260 260'});
+    var title = document.createElement('h2');
+    title.textContent = 'Method 2: clipPath (exclusion)';
+    var desc = document.createElement('p');
+    desc.textContent = 'A <clipPath> with evenodd defines the visible area: ' +
+        'a large rectangle minus the slit. The mask circle is clipped by this. ' +
+        'Alternative approach, more complex.';
+    
+    var defs = el('defs', {});
+    // clipPath: big rect - slit (evenodd makes slit a hole in the clip region)
+    var cp = el('clipPath', {id:'slitClip'});
+    var clipD = 'M-200,-200L200,-200L200,200L-200,200Z' + slitD;
+    cp.appendChild(el('path', {d: clipD, 'fill-rule':'evenodd'}));
+    defs.appendChild(cp);
+    svg.appendChild(defs);
+    
+    var g = el('g', {'clip-path':'url(#slitClip)'});
+    // Mask with central hole
+    var maskD = circlePath(0,0,totalR) + circlePath(0,0,holeR);
+    g.appendChild(el('path', {d: maskD, fill:'#000', stroke:'none', 'fill-rule':'evenodd'}));
+    svg.appendChild(g);
+    // Colored edge overlay
+    svg.appendChild(el('path', {d: slitD, fill:'none', stroke:'#FF0000', 'stroke-width':'0.5'}));
+    
+    document.getElementById('m2').appendChild(title);
+    document.getElementById('m2').appendChild(desc);
+    document.getElementById('m2').appendChild(svg);
+})();
+
+// ================================================================
+// METHOD 3: mask element approach
+// Uses an SVG <mask>: white = visible, black = hidden.
+// The mask is white everywhere except the slit (black).
+// ================================================================
+(function() {
+    var svg = el('svg', {width:250, height:250, viewBox:'-130 -130 260 260'});
+    var title = document.createElement('h2');
+    title.textContent = 'Method 3: SVG <mask> element';
+    var desc = document.createElement('p');
+    desc.textContent = 'An SVG <mask> defines visibility: white=show, black=hide. ' +
+        'A white rectangle covers all, then the slit is drawn in black (hidden). ' +
+        'The mask disk is rendered with this mask applied.';
+    
+    var defs = el('defs', {});
+    var mask = el('mask', {id:'slitMask'});
+    mask.appendChild(el('rect', {x:-200,y:-200,width:400,height:400,fill:'white'}));
+    mask.appendChild(el('path', {d: slitD, fill:'black'}));
+    defs.appendChild(mask);
+    svg.appendChild(defs);
+    
+    // Mask with central hole, with mask applied
+    var maskD = circlePath(0,0,totalR) + circlePath(0,0,holeR);
+    svg.appendChild(el('path', {d: maskD, fill:'#000', stroke:'none', 'fill-rule':'evenodd', mask:'url(#slitMask)'}));
+    // Colored edge overlay
+    svg.appendChild(el('path', {d: slitD, fill:'none', stroke:'#FF0000', 'stroke-width':'0.5'}));
+    
+    document.getElementById('m3').appendChild(title);
+    document.getElementById('m3').appendChild(desc);
+    document.getElementById('m3').appendChild(svg);
+})();
+</script>
+</body>
+</html>

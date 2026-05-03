@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<!-- TroBahtinov_configurable_Splittable - Release v1.0 | License: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Test: Offset Angle × Bahtinov Angle Permutations</title>
+<style>
+body { font-family: Arial, sans-serif; background: #eee; padding: 20px; }
+h1 { margin-bottom: 5px; }
+p.info { font-size: 13px; color: #555; margin-bottom: 20px; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+.cell { background: #D8D8D8; border: 1px solid #aaa; padding: 10px; text-align: center; }
+.cell svg { display: block; margin: 0 auto; width: 100%; height: auto; }
+.cell p { margin: 4px 0 0; font-size: 12px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Test: Sector/Subsector constructors with angle permutations</h1>
+<p class="info">As = [0°, 10°, 40°, 80°] × A_off = [0°, 40°, 90°, 180°] — 16 combinations.<br>
+Each mask shows a scale bar at the bottom indicating TDiam in mm.</p>
+
+<div class="grid" id="grid"></div>
+
+<script>
+// ============================================================
+// Inline copy of mask engine (self-contained test page)
+// ============================================================
+function deg2rad(d) { return d * Math.PI / 180; }
+
+var SVG_NS = 'http://www.w3.org/2000/svg';
+
+function createSvgElement(tag, attrs) {
+    var el = document.createElementNS(SVG_NS, tag);
+    for (var k in attrs) { if (attrs.hasOwnProperty(k)) el.setAttribute(k, attrs[k]); }
+    return el;
+}
+
+function polygonToPathD(poly) {
+    if (!poly || poly.length < 3) return '';
+    var d = 'M' + poly[0][0] + ',' + poly[0][1];
+    for (var i = 1; i < poly.length; i++) d += 'L' + poly[i][0] + ',' + poly[i][1];
+    return d + 'Z';
+}
+
+function svgCirclePath(cx, cy, r) {
+    return 'M' + (cx - r) + ',' + cy +
+           'A' + r + ',' + r + ' 0 1,0 ' + (cx + r) + ',' + cy +
+           'A' + r + ',' + r + ' 0 1,0 ' + (cx - r) + ',' + cy + 'Z';
+}
+
+function sutherlandHodgman(subject, clip) {
+    if (!subject || subject.length < 3) return [];
+    if (!clip || clip.length < 3) return [];
+    var output = subject.slice();
+    for (var i = 0; i < clip.length; i++) {
+        if (output.length === 0) return [];
+        var input = output; output = [];
+        var edgeStart = clip[i], edgeEnd = clip[(i + 1) % clip.length];
+        for (var j = 0; j < input.length; j++) {
+            var current = input[j], previous = input[(j + input.length - 1) % input.length];
+            var currIn = isInsideEdge(current, edgeStart, edgeEnd);
+            var prevIn = isInsideEdge(previous, edgeStart, edgeEnd);
+            if (currIn) {
+                if (!prevIn) { var inter = lineIntersect(previous, current, edgeStart, edgeEnd); if (inter) output.push(inter); }
+                output.push(current);
+            } else if (prevIn) { var inter = lineIntersect(previous, current, edgeStart, edgeEnd); if (inter) output.push(inter); }
+        }
+    }
+    return output;
+}
+function isInsideEdge(point, edgeStart, edgeEnd) {
+    return (edgeEnd[0] - edgeStart[0]) * (point[1] - edgeStart[1]) - (edgeEnd[1] - edgeStart[1]) * (point[0] - edgeStart[0]) >= 0;
+}
+function lineIntersect(p1, p2, p3, p4) {
+    var x1=p1[0],y1=p1[1],x2=p2[0],y2=p2[1],x3=p3[0],y3=p3[1],x4=p4[0],y4=p4[1];
+    var denom = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+    if (Math.abs(denom) < 1e-12) return null;
+    var t = ((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/denom;
+    return [x1+t*(x2-x1), y1+t*(y2-y1)];
+}
+
+function buildReducedSector(sector_start, sector_end, rInner, rOuter, stemW, arcRes) {
+    arcRes = arcRes || 60;
+    var dAngle_inner_left = Math.asin(Math.min(stemW / rInner, 1));
+    var dAngle_outer_left = Math.asin(Math.min(stemW / rOuter, 1));
+    var dAngle_inner_right = Math.asin(Math.min(stemW / rInner, 1));
+    var dAngle_outer_right = Math.asin(Math.min(stemW / rOuter, 1));
+    var ang_start_inner = sector_start + dAngle_inner_left;
+    var ang_start_outer = sector_start + dAngle_outer_left;
+    var ang_end_inner = sector_end - dAngle_inner_right;
+    var ang_end_outer = sector_end - dAngle_outer_right;
+    var poly = [];
+    poly.push([rInner * Math.cos(ang_start_inner), rInner * Math.sin(ang_start_inner)]);
+    var outerStep = (ang_end_outer - ang_start_outer) / arcRes;
+    for (var i = 0; i <= arcRes; i++) { var a = ang_start_outer + i * outerStep; poly.push([rOuter * Math.cos(a), rOuter * Math.sin(a)]); }
+    poly.push([rInner * Math.cos(ang_end_inner), rInner * Math.sin(ang_end_inner)]);
+    var innerStep = (ang_end_inner - ang_start_inner) / arcRes;
+    for (var i = arcRes; i >= 0; i--) { var a = ang_start_inner + i * innerStep; poly.push([rInner * Math.cos(a), rInner * Math.sin(a)]); }
+    return poly;
+}
+
+function buildSlitRect(tiltRad, offset, slitWidth, length) {
+    var ax = Math.cos(tiltRad), ay = Math.sin(tiltRad);
+    var px = -ay, py = ax;
+    var cx = offset * px, cy = offset * py;
+    var hl = length / 2, hw = slitWidth / 2;
+    return [
+        [cx - hl*ax - hw*px, cy - hl*ay - hw*py],
+        [cx + hl*ax - hw*px, cy + hl*ay - hw*py],
+        [cx + hl*ax + hw*px, cy + hl*ay + hw*py],
+        [cx - hl*ax + hw*px, cy - hl*ay + hw*py]
+    ];
+}
+
+function generateSectorSlits(tiltDeg, sector_start_deg, sector_end_deg, rInner, rOuter, stemW, slits_step, slits_d) {
+    var tiltRad = deg2rad(tiltDeg);
+    var sector_start = deg2rad(sector_start_deg);
+    var sector_end = deg2rad(sector_end_deg);
+    var reducedSector = buildReducedSector(sector_start, sector_end, rInner, rOuter, stemW, 60);
+    var slitLength = 2 * rOuter + 10;
+    var slits = [];
+    var k_max = Math.ceil(rOuter / slits_step);
+    for (var k = -k_max; k <= k_max; k++) {
+        var offset = k * slits_step;
+        var slitRect = buildSlitRect(tiltRad, offset, slits_d, slitLength);
+        var clipped = sutherlandHodgman(reducedSector, slitRect);
+        if (clipped && clipped.length >= 3) slits.push(clipped);
+    }
+    return slits;
+}
+
+function adjustColorLuminosity(hex, delta) {
+    var r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+    var max = Math.max(r,g,b), min = Math.min(r,g,b);
+    var h, s, l = (max+min)/2;
+    if (max===min){h=s=0;} else {
+        var d2=max-min; s=l>0.5?d2/(2-max-min):d2/(max+min);
+        if(max===r)h=((g-b)/d2+(g<b?6:0))/6; else if(max===g)h=((b-r)/d2+2)/6; else h=((r-g)/d2+4)/6;
+    }
+    l=Math.max(0,Math.min(1,l+delta));
+    var r2,g2,b2;
+    if(s===0){r2=g2=b2=l;} else {
+        var q=l<0.5?l*(1+s):l+s-l*s, p2=2*l-q;
+        r2=hue2rgb(p2,q,h+1/3); g2=hue2rgb(p2,q,h); b2=hue2rgb(p2,q,h-1/3);
+    }
+    return '#'+toHex2(Math.round(r2*255))+toHex2(Math.round(g2*255))+toHex2(Math.round(b2*255));
+}
+function hue2rgb(p,q,t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}
+function toHex2(v){var h=v.toString(16);return h.length<2?'0'+h:h;}
+
+// ============================================================
+// DRAW ONE MASK with given As, A_off
+// ============================================================
+function drawTestMask(container, As, A_off) {
+    var FL = 1500, TDiam = 220, Diam = 205, Rh = 15, Rth = 5, SectorsStem_th = 6;
+    var BahF = 150, OF = 1, Sd_Sst_rat = 1.5;
+
+    var slits_step = OF * FL / BahF;
+    var slits_w = (Diam / 2 - Rth - Rth - Rh) / 2;
+    var slits_d = slits_step / (1 + Sd_Sst_rat);
+
+    var totalR = TDiam / 2;
+    var r_R1_outer = Rh + Rth;
+    var r_R2_outer = r_R1_outer + slits_w;
+    var r_R3_outer = r_R2_outer + Rth;
+    var r_R4_outer = r_R3_outer + slits_w;
+    var stemHalfW = SectorsStem_th / 2;
+
+    // Extra space for scale bar
+    var vbSize = TDiam * 1.2;
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', (-vbSize/2) + ' ' + (-vbSize/2) + ' ' + vbSize + ' ' + (vbSize + 20));
+
+    // Mask body
+    var maskPath = svgCirclePath(0, 0, totalR) + svgCirclePath(0, 0, Rh);
+    svg.appendChild(createSvgElement('path', { d: maskPath, fill: '#000', stroke: 'none', 'fill-rule': 'evenodd' }));
+
+    var r2Colors = ['#FF0000', '#00FF00', '#0000FF'];
+
+    // R2 slits
+    for (var si = 0; si < 3; si++) {
+        var sectorBase = si * 120;
+        var sectorStart = sectorBase - 60;
+        var sectorEnd = sectorBase + 60;
+        var tilt = sectorBase + A_off;
+        var slits = generateSectorSlits(tilt, sectorStart, sectorEnd, r_R1_outer, r_R2_outer, stemHalfW, slits_step, slits_d);
+        for (var j = 0; j < slits.length; j++) {
+            var poly = slits[j];
+            var svgPoly = poly.map(function(p) { return [p[0], -p[1]]; });
+            var pathD = polygonToPathD(svgPoly);
+            if (pathD) svg.appendChild(createSvgElement('path', { d: pathD, fill: r2Colors[si], stroke: r2Colors[si], 'stroke-width': '0.1' }));
+        }
+    }
+
+    // R4 slits
+    var ColRel = 0.20;
+    var r4Subsectors = [
+        { center: 210, tilt: 0 + A_off + As, colorIdx: 0, variant: 'a' },
+        { center: 150, tilt: 0 + A_off - As, colorIdx: 0, variant: 'b' },
+        { center: 330, tilt: 120 + A_off + As, colorIdx: 1, variant: 'a' },
+        { center: 270, tilt: 120 + A_off - As, colorIdx: 1, variant: 'b' },
+        { center: 90, tilt: 240 + A_off + As, colorIdx: 2, variant: 'a' },
+        { center: 30, tilt: 240 + A_off - As, colorIdx: 2, variant: 'b' }
+    ];
+    for (var si = 0; si < r4Subsectors.length; si++) {
+        var sub = r4Subsectors[si];
+        var subStart = sub.center - 30;
+        var subEnd = sub.center + 30;
+        var baseColor = r2Colors[sub.colorIdx];
+        var delta = (sub.variant === 'a') ? ColRel : -ColRel;
+        var slitColor = adjustColorLuminosity(baseColor, delta);
+        var slits = generateSectorSlits(sub.tilt, subStart, subEnd, r_R3_outer, r_R4_outer, stemHalfW, slits_step, slits_d);
+        for (var j = 0; j < slits.length; j++) {
+            var poly = slits[j];
+            var svgPoly = poly.map(function(p) { return [p[0], -p[1]]; });
+            var pathD = polygonToPathD(svgPoly);
+            if (pathD) svg.appendChild(createSvgElement('path', { d: pathD, fill: slitColor, stroke: slitColor, 'stroke-width': '0.1' }));
+        }
+    }
+
+    // Scale bar at bottom: line of length TDiam, centered horizontally
+    var barY = totalR + 12;
+    var barX1 = -totalR;
+    var barX2 = totalR;
+    // Main line
+    svg.appendChild(createSvgElement('line', { x1: barX1, y1: barY, x2: barX2, y2: barY, stroke: '#000', 'stroke-width': '1' }));
+    // End ticks
+    svg.appendChild(createSvgElement('line', { x1: barX1, y1: barY - 3, x2: barX1, y2: barY + 3, stroke: '#000', 'stroke-width': '1' }));
+    svg.appendChild(createSvgElement('line', { x1: barX2, y1: barY - 3, x2: barX2, y2: barY + 3, stroke: '#000', 'stroke-width': '1' }));
+    // Label
+    var label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', '0');
+    label.setAttribute('y', (barY + 12).toString());
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('font-size', '8');
+    label.setAttribute('font-family', 'Arial');
+    label.setAttribute('fill', '#000');
+    label.textContent = TDiam + ' mm';
+    svg.appendChild(label);
+
+    container.appendChild(svg);
+}
+
+// ============================================================
+// RENDER ALL PERMUTATIONS
+// ============================================================
+window.addEventListener('DOMContentLoaded', function() {
+    var asValues = [0, 10, 40, 80];
+    var aOffValues = [0, 40, 90, 180];
+    var grid = document.getElementById('grid');
+
+    for (var ai = 0; ai < asValues.length; ai++) {
+        for (var oi = 0; oi < aOffValues.length; oi++) {
+            var As = asValues[ai];
+            var A_off = aOffValues[oi];
+
+            var cell = document.createElement('div');
+            cell.className = 'cell';
+            drawTestMask(cell, As, A_off);
+
+            var label = document.createElement('p');
+            label.textContent = 'As=' + As + '°, A_off=' + A_off + '°';
+            cell.appendChild(label);
+
+            grid.appendChild(cell);
+        }
+    }
+});
+</script>
+</body>
+</html>

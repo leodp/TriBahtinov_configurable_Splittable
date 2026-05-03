@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<!-- TroBahtinov_configurable_Splittable - Release v1.0 | License: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rounding Test - Tilted Rectangle</title>
+<style>
+body { font-family: Arial, sans-serif; background: #eee; padding: 20px; }
+h2 { margin-top: 30px; }
+.row { display: flex; flex-wrap: wrap; gap: 20px; }
+.cell { background: #fff; border: 1px solid #ccc; padding: 10px; text-align: center; }
+.cell svg { display: block; margin: 0 auto; }
+.cell p { margin: 5px 0 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Rounding Test: Rectangle tilted 25°</h1>
+<p>Rectangle: TDiam × TDiam/2 = 220mm × 110mm, tilted 25°.<br>
+Rounding radius = Rounding_factor × TDiam/5 (where TDiam/5 = 44mm).<br>
+Each corner is filleted with a circle of that radius, tangent to both adjacent edges.</p>
+
+<div class="row" id="testRow"></div>
+
+<script>
+// ============================================================
+// ROUNDING ALGORITHM
+// ============================================================
+
+// Build a rectangle polygon (4 vertices) tilted at angleDeg, centered at (cx,cy)
+function buildTiltedRect(cx, cy, width, height, angleDeg) {
+    var a = angleDeg * Math.PI / 180;
+    var cosA = Math.cos(a), sinA = Math.sin(a);
+    var hw = width / 2, hh = height / 2;
+    // Local corners: top-left, top-right, bottom-right, bottom-left (CCW)
+    var corners = [
+        [-hw, -hh],
+        [ hw, -hh],
+        [ hw,  hh],
+        [-hw,  hh]
+    ];
+    return corners.map(function(c) {
+        return [cx + c[0] * cosA - c[1] * sinA,
+                cy + c[0] * sinA + c[1] * cosA];
+    });
+}
+
+// Apply rounding to all vertices of a polygon.
+// Returns a new polygon (with more vertices approximating arcs at corners).
+// roundingRadius: the fillet radius
+// arcSegments: number of line segments per rounded corner arc
+function applyRounding(poly, roundingRadius, arcSegments) {
+    if (roundingRadius <= 0 || !poly || poly.length < 3) return poly;
+    arcSegments = arcSegments || 16;
+
+    var result = [];
+    var n = poly.length;
+
+    for (var i = 0; i < n; i++) {
+        var prev = poly[(i + n - 1) % n];
+        var curr = poly[i];
+        var next = poly[(i + 1) % n];
+
+        // Edge vectors from current vertex
+        var d1x = prev[0] - curr[0], d1y = prev[1] - curr[1];
+        var d2x = next[0] - curr[0], d2y = next[1] - curr[1];
+
+        var len1 = Math.sqrt(d1x * d1x + d1y * d1y);
+        var len2 = Math.sqrt(d2x * d2x + d2y * d2y);
+
+        if (len1 < 1e-9 || len2 < 1e-9) {
+            result.push(curr);
+            continue;
+        }
+
+        // Normalize
+        var u1x = d1x / len1, u1y = d1y / len1;
+        var u2x = d2x / len2, u2y = d2y / len2;
+
+        // Half-angle between the two edges (interior angle bisector)
+        // cos(half_angle) = dot(u1, u2) ... no, we need the angle between edges at vertex
+        var dot = u1x * u2x + u1y * u2y;
+        dot = Math.max(-1, Math.min(1, dot)); // clamp
+        var angle = Math.acos(dot); // angle between the two edge directions (from vertex)
+        var halfAngle = angle / 2;
+
+        if (Math.abs(Math.sin(halfAngle)) < 1e-9) {
+            // Degenerate (edges are collinear), skip rounding
+            result.push(curr);
+            continue;
+        }
+
+        // Distance from vertex to tangent point along each edge
+        var tangentDist = roundingRadius / Math.tan(halfAngle);
+
+        // If tangent distance exceeds half of either edge, reduce radius
+        var maxDist = Math.min(len1 / 2, len2 / 2);
+        var effectiveR = roundingRadius;
+        if (tangentDist > maxDist) {
+            tangentDist = maxDist;
+            effectiveR = tangentDist * Math.tan(halfAngle);
+        }
+
+        // Tangent points
+        var t1x = curr[0] + u1x * tangentDist;
+        var t1y = curr[1] + u1y * tangentDist;
+        var t2x = curr[0] + u2x * tangentDist;
+        var t2y = curr[1] + u2y * tangentDist;
+
+        // Center of fillet circle: along the bisector, at distance R/sin(halfAngle) from vertex
+        var bisX = u1x + u2x, bisY = u1y + u2y;
+        var bisLen = Math.sqrt(bisX * bisX + bisY * bisY);
+        if (bisLen < 1e-9) {
+            result.push(curr);
+            continue;
+        }
+        bisX /= bisLen; bisY /= bisLen;
+        var centerDist = effectiveR / Math.sin(halfAngle);
+        var cxF = curr[0] + bisX * centerDist;
+        var cyF = curr[1] + bisY * centerDist;
+
+        // Arc from t1 to t2 around center (cxF, cyF)
+        var startAngle = Math.atan2(t1y - cyF, t1x - cxF);
+        var endAngle = Math.atan2(t2y - cyF, t2x - cxF);
+
+        // Determine arc direction: the fillet arc should curve inward.
+        // Cross product of (u1, u2) determines convexity at this vertex.
+        // For a convex corner in a CCW polygon, cross < 0, and arc goes CCW.
+        // For a convex corner in a CW polygon, cross > 0, and arc goes CW.
+        var cross = u1x * u2y - u1y * u2x;
+        var arcDir = (cross > 0) ? -1 : 1;
+
+        // Normalize angle sweep
+        var sweep = endAngle - startAngle;
+        if (arcDir > 0) {
+            while (sweep < 0) sweep += 2 * Math.PI;
+            if (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
+        } else {
+            while (sweep > 0) sweep -= 2 * Math.PI;
+            if (sweep < -2 * Math.PI) sweep += 2 * Math.PI;
+        }
+
+        // Generate arc points
+        for (var s = 0; s <= arcSegments; s++) {
+            var t = s / arcSegments;
+            var a2 = startAngle + sweep * t;
+            result.push([cxF + effectiveR * Math.cos(a2), cyF + effectiveR * Math.sin(a2)]);
+        }
+    }
+
+    return result;
+}
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function polygonToSvgPath(poly) {
+    if (!poly || poly.length < 3) return '';
+    var d = 'M' + poly[0][0].toFixed(2) + ',' + poly[0][1].toFixed(2);
+    for (var i = 1; i < poly.length; i++) {
+        d += 'L' + poly[i][0].toFixed(2) + ',' + poly[i][1].toFixed(2);
+    }
+    return d + 'Z';
+}
+
+function renderTest() {
+    var TDiam = 220;
+    var width = TDiam, height = TDiam / 2;
+    var tiltAngle = 25;
+    var baseRounding = TDiam / 5; // = 44mm
+
+    // Rounding factors from the menu
+    var roundingFactors = [0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 1.0];
+
+    var container = document.getElementById('testRow');
+
+    for (var i = 0; i < roundingFactors.length; i++) {
+        var factor = roundingFactors[i];
+        var radius = factor * baseRounding;
+
+        // Build tilted rectangle
+        var rect = buildTiltedRect(0, 0, width, height, tiltAngle);
+
+        // Apply rounding
+        var rounded = applyRounding(rect, radius, 20);
+
+        // Create SVG
+        var margin = 20;
+        var vbSize = TDiam + margin * 2;
+        var svgNS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', '280');
+        svg.setAttribute('height', '280');
+        svg.setAttribute('viewBox', (-vbSize/2) + ' ' + (-vbSize/2) + ' ' + vbSize + ' ' + vbSize);
+
+        // Background
+        var bg = document.createElementNS(svgNS, 'rect');
+        bg.setAttribute('x', -vbSize/2); bg.setAttribute('y', -vbSize/2);
+        bg.setAttribute('width', vbSize); bg.setAttribute('height', vbSize);
+        bg.setAttribute('fill', '#f8f8f8');
+        svg.appendChild(bg);
+
+        // Original rectangle (dashed outline)
+        var origPath = document.createElementNS(svgNS, 'path');
+        origPath.setAttribute('d', polygonToSvgPath(rect));
+        origPath.setAttribute('fill', 'none');
+        origPath.setAttribute('stroke', '#aaa');
+        origPath.setAttribute('stroke-width', '1');
+        origPath.setAttribute('stroke-dasharray', '4,3');
+        svg.appendChild(origPath);
+
+        // Rounded polygon
+        var roundedPath = document.createElementNS(svgNS, 'path');
+        roundedPath.setAttribute('d', polygonToSvgPath(rounded));
+        roundedPath.setAttribute('fill', 'rgba(50,120,200,0.3)');
+        roundedPath.setAttribute('stroke', '#2060c0');
+        roundedPath.setAttribute('stroke-width', '1.5');
+        svg.appendChild(roundedPath);
+
+        // Mark fillet circles at each corner (for non-zero rounding)
+        if (radius > 0) {
+            for (var c = 0; c < rect.length; c++) {
+                var corner = rect[c];
+                var dot = document.createElementNS(svgNS, 'circle');
+                dot.setAttribute('cx', corner[0]);
+                dot.setAttribute('cy', corner[1]);
+                dot.setAttribute('r', '3');
+                dot.setAttribute('fill', 'red');
+                svg.appendChild(dot);
+            }
+        }
+
+        // Wrap in cell
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.appendChild(svg);
+
+        var label = document.createElement('p');
+        label.textContent = 'Factor: ' + factor + ' | R=' + radius.toFixed(1) + 'mm';
+        cell.appendChild(label);
+
+        container.appendChild(cell);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', renderTest);
+</script>
+</body>
+</html>
