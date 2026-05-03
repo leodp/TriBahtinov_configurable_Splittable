@@ -551,6 +551,7 @@ function applyRounding(poly, roundingRadius, arcSegments) {
 
     var n = poly.length;
     var COLLINEAR_THRESHOLD = 5 * Math.PI / 180; // 5° — vertices with less turn are "arc" vertices (lowered to catch stem/curve intersections)
+    var winding = (polyArea(poly) >= 0) ? 1 : -1;
 
     // Compute turning angle at each vertex
     function turningAngle(i) {
@@ -567,10 +568,21 @@ function applyRounding(poly, roundingRadius, arcSegments) {
         return Math.PI - Math.acos(dot);
     }
 
+    // Only round convex corners; rounding concave corners can create inward hooks.
+    function isConvexVertex(i) {
+        var prev = poly[(i + n - 1) % n];
+        var curr = poly[i];
+        var next = poly[(i + 1) % n];
+        var e1x = curr[0] - prev[0], e1y = curr[1] - prev[1];
+        var e2x = next[0] - curr[0], e2y = next[1] - curr[1];
+        var cross = e1x * e2y - e1y * e2x;
+        return (winding * cross) > 1e-9;
+    }
+
     // Mark significant vertices
     var isSignificant = [];
     for (var i = 0; i < n; i++) {
-        isSignificant.push(Math.abs(turningAngle(i)) > COLLINEAR_THRESHOLD);
+        isSignificant.push(Math.abs(turningAngle(i)) > COLLINEAR_THRESHOLD && isConvexVertex(i));
     }
 
     // Edge length between consecutive vertices
@@ -630,9 +642,9 @@ function applyRounding(poly, roundingRadius, arcSegments) {
         var tangentDist = roundingRadius / Math.tan(halfAngle);
         var availBack = accumLenBack(i);
         var availFwd = accumLenFwd(i);
-        // Allow fillet to consume up to 99% of each side
-        var maxDistBack = availBack * 0.99;
-        var maxDistFwd = availFwd * 0.99;
+        // Keep tangent points away from edge endpoints to avoid pinched arcs.
+        var maxDistBack = availBack * 0.80;
+        var maxDistFwd = availFwd * 0.80;
         var maxDist = Math.min(maxDistBack, maxDistFwd);
         if (tangentDist > maxDist) {
             // Reduce fillet: move center inward so arc remains tangent
@@ -726,29 +738,52 @@ function applyRounding(poly, roundingRadius, arcSegments) {
         if (bisLen < 1e-9) { result.push(curr); continue; }
         bisX /= bisLen; bisY /= bisLen;
         var centerDist = effectiveR / Math.sin(halfAngle);
-        var cxF = curr[0] + bisX * centerDist;
-        var cyF = curr[1] + bisY * centerDist;
+        var cAx = curr[0] + bisX * centerDist;
+        var cAy = curr[1] + bisY * centerDist;
+        var cBx = curr[0] - bisX * centerDist;
+        var cBy = curr[1] - bisY * centerDist;
 
-        // Arc from t1 to t2
-        var startAngle = Math.atan2(t1y - cyF, t1x - cxF);
-        var endAngle = Math.atan2(t2y - cyF, t2x - cxF);
+        function minorArcForCenter(cx, cy) {
+            var a0 = Math.atan2(t1y - cy, t1x - cx);
+            var a1 = Math.atan2(t2y - cy, t2x - cx);
+            var sw = a1 - a0;
+            while (sw > Math.PI) sw -= 2 * Math.PI;
+            while (sw < -Math.PI) sw += 2 * Math.PI;
+            var amid = a0 + 0.5 * sw;
+            return {
+                cx: cx,
+                cy: cy,
+                start: a0,
+                sweep: sw,
+                mid: [cx + effectiveR * Math.cos(amid), cy + effectiveR * Math.sin(amid)]
+            };
+        }
 
-        var cross = u1x * u2y - u1y * u2x;
-        var arcDir = (cross > 0) ? -1 : 1;
+        var insideA = pointInPolygon([cAx, cAy], poly);
+        var insideB = pointInPolygon([cBx, cBy], poly);
+        var arcA = minorArcForCenter(cAx, cAy);
+        var arcB = minorArcForCenter(cBx, cBy);
+        var arcAInside = pointInPolygon(arcA.mid, poly);
+        var arcBInside = pointInPolygon(arcB.mid, poly);
 
-        var sweep = endAngle - startAngle;
-        if (arcDir > 0) {
-            while (sweep < 0) sweep += 2 * Math.PI;
-            if (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
+        var useArc = null;
+        if (insideA && arcAInside && !(insideB && arcBInside)) {
+            useArc = arcA;
+        } else if (insideB && arcBInside && !(insideA && arcAInside)) {
+            useArc = arcB;
+        } else if (insideA && arcAInside) {
+            useArc = arcA;
+        } else if (insideB && arcBInside) {
+            useArc = arcB;
         } else {
-            while (sweep > 0) sweep -= 2 * Math.PI;
-            if (sweep < -2 * Math.PI) sweep += 2 * Math.PI;
+            result.push(curr);
+            continue;
         }
 
         for (var s = 0; s <= arcSegments; s++) {
             var t = s / arcSegments;
-            var a2 = startAngle + sweep * t;
-            result.push([cxF + effectiveR * Math.cos(a2), cyF + effectiveR * Math.sin(a2)]);
+            var a2 = useArc.start + useArc.sweep * t;
+            result.push([useArc.cx + effectiveR * Math.cos(a2), useArc.cy + effectiveR * Math.sin(a2)]);
         }
     }
 
@@ -783,6 +818,133 @@ function polygonToPathD(poly) {
     }
     d += 'Z';
     return d;
+}
+
+function pointInPolygon(pt, poly) {
+    if (!poly || poly.length < 3) return false;
+    var x = pt[0], y = pt[1];
+    var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        var xi = poly[i][0], yi = poly[i][1];
+        var xj = poly[j][0], yj = poly[j][1];
+        var intersect = ((yi > y) !== (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / ((yj - yi) + 1e-30) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+function polygonPerimeter(poly) {
+    if (!poly || poly.length < 2) return 0;
+    var p = 0;
+    for (var i = 0; i < poly.length; i++) {
+        var j = (i + 1) % poly.length;
+        var dx = poly[j][0] - poly[i][0];
+        var dy = poly[j][1] - poly[i][1];
+        p += Math.sqrt(dx * dx + dy * dy);
+    }
+    return p;
+}
+
+function removeNearDuplicateVertices(poly, eps) {
+    if (!poly || poly.length === 0) return [];
+    eps = eps || 1e-5;
+    var out = [poly[0]];
+    for (var i = 1; i < poly.length; i++) {
+        var dx = poly[i][0] - out[out.length - 1][0];
+        var dy = poly[i][1] - out[out.length - 1][1];
+        if (dx * dx + dy * dy > eps * eps) out.push(poly[i]);
+    }
+    if (out.length > 1) {
+        var dx0 = out[0][0] - out[out.length - 1][0];
+        var dy0 = out[0][1] - out[out.length - 1][1];
+        if (dx0 * dx0 + dy0 * dy0 <= eps * eps) out.pop();
+    }
+    return out;
+}
+
+function orient(a, b, c) {
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+}
+
+function onSeg(a, b, c) {
+    return Math.min(a[0], b[0]) <= c[0] + 1e-9 && c[0] <= Math.max(a[0], b[0]) + 1e-9 &&
+           Math.min(a[1], b[1]) <= c[1] + 1e-9 && c[1] <= Math.max(a[1], b[1]) + 1e-9;
+}
+
+function segmentsIntersect(a, b, c, d) {
+    var o1 = orient(a, b, c);
+    var o2 = orient(a, b, d);
+    var o3 = orient(c, d, a);
+    var o4 = orient(c, d, b);
+
+    if ((o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0)) return true;
+    if (Math.abs(o1) < 1e-9 && onSeg(a, b, c)) return true;
+    if (Math.abs(o2) < 1e-9 && onSeg(a, b, d)) return true;
+    if (Math.abs(o3) < 1e-9 && onSeg(c, d, a)) return true;
+    if (Math.abs(o4) < 1e-9 && onSeg(c, d, b)) return true;
+    return false;
+}
+
+function isSelfIntersecting(poly) {
+    if (!poly || poly.length < 4) return false;
+    var n = poly.length;
+    for (var i = 0; i < n; i++) {
+        var a1 = poly[i], a2 = poly[(i + 1) % n];
+        for (var j = i + 1; j < n; j++) {
+            if (Math.abs(i - j) <= 1) continue;
+            if (i === 0 && j === n - 1) continue;
+            var b1 = poly[j], b2 = poly[(j + 1) % n];
+            if (segmentsIntersect(a1, a2, b1, b2)) return true;
+        }
+    }
+    return false;
+}
+
+function sanitizeSlitPolygon(poly, p, minAreaScale, minThicknessScale) {
+    if (!poly || poly.length < 3) return null;
+    var cleaned = removeNearDuplicateVertices(poly, 1e-5);
+    if (cleaned.length < 3) return null;
+
+    var area = Math.abs(polyArea(cleaned));
+    var minArea = p.slits_d * p.slits_d * (minAreaScale || 0.08);
+    if (area <= minArea) return null;
+
+    var per = polygonPerimeter(cleaned);
+    if (per <= 1e-9) return null;
+
+    // 2A/P behaves like an effective thickness; reject near-line artifacts.
+    var effThickness = (2 * area) / per;
+    var minEffThickness = p.slits_d * (minThicknessScale || 0.22);
+    if (effThickness <= minEffThickness) return null;
+
+    if (isSelfIntersecting(cleaned)) return null;
+    return cleaned;
+}
+
+function safeApplyRounding(poly, targetRadius, p) {
+    if (!poly || poly.length < 3 || targetRadius <= 0) return poly;
+
+    var base = sanitizeSlitPolygon(poly, p, 0.06, 0.16);
+    if (!base) return null;
+
+    var baseArea = Math.abs(polyArea(base));
+    var r = targetRadius;
+
+    // Try requested fillet first, then progressively relax until geometry is valid.
+    for (var it = 0; it < 10; it++) {
+        var rounded = applyRounding(base, r, 12);
+        var cleaned = sanitizeSlitPolygon(rounded, p, 0.08, 0.22);
+        if (cleaned) {
+            var a = Math.abs(polyArea(cleaned));
+            // Reject excessive collapse; this is where inward-bend artifacts start.
+            if (a >= baseArea * 0.55) return cleaned;
+        }
+        r *= 0.7;
+    }
+
+    // Keep original slit when high rounding would generate invalid geometry.
+    return base;
 }
 
 // ============================================================
@@ -1010,18 +1172,14 @@ function generateSectorSlits(tiltDeg, sector_start_deg, sector_end_deg, rInner, 
         var clipped = sutherlandHodgman(reducedSector, slitRect);
 
         if (clipped && clipped.length >= 3) {
-            // Filter zero-width / degenerate slits by checking area
-            var slitArea = Math.abs(polyArea(clipped));
-            var minArea = p.slits_d * p.slits_d * 0.05; // minimum viable slit area
-            if (slitArea > minArea) {
-                // PINCH-SPLIT: detect and split polygons with zero-width sections
-                var splitParts = splitPinchedPolygon(clipped);
-                for (var sp = 0; sp < splitParts.length; sp++) {
-                    var part = splitParts[sp];
-                    if (part.length >= 3 && Math.abs(polyArea(part)) > minArea) {
-                        slits.push(part);
-                    }
-                }
+            var basePart = sanitizeSlitPolygon(clipped, p, 0.08, 0.20);
+            if (!basePart) continue;
+
+            // PINCH-SPLIT: detect and split polygons with zero-width sections
+            var splitParts = splitPinchedPolygon(basePart);
+            for (var sp = 0; sp < splitParts.length; sp++) {
+                var part = sanitizeSlitPolygon(splitParts[sp], p, 0.08, 0.20);
+                if (part) slits.push(part);
             }
         }
     }
@@ -1038,7 +1196,7 @@ function generateSectorSlits(tiltDeg, sector_start_deg, sector_end_deg, rInner, 
 function splitPinchedPolygon(poly) {
     if (!poly || poly.length < 4) return [poly];
     var n = poly.length;
-    var TOL = 0.01; // tolerance for coincident points
+    var TOL = 0.001; // tolerance for coincident points
     
     // Find pinch points: vertex i and vertex j (non-adjacent) that are very close
     for (var i = 0; i < n; i++) {
@@ -1193,7 +1351,9 @@ function drawMask() {
                                          r_R1_outer, r_R2_outer, stemHalfW);
         for (var j = 0; j < slits.length; j++) {
             var poly = slits[j];
-            if (roundR > 0) poly = applyRounding(poly, roundR, 12);
+            if (roundR > 0) poly = safeApplyRounding(poly, roundR, p);
+            poly = sanitizeSlitPolygon(poly, p, 0.06, 0.16);
+            if (!poly) continue;
             collectedSlits.push(poly);
             allSlitData.push({ poly: poly, color: r2Colors[si] });
         }
@@ -1221,7 +1381,9 @@ function drawMask() {
                                          r_R3_outer, r_R4_outer, stemHalfW);
         for (var j = 0; j < slits.length; j++) {
             var poly = slits[j];
-            if (roundR > 0) poly = applyRounding(poly, roundR, 12);
+            if (roundR > 0) poly = safeApplyRounding(poly, roundR, p);
+            poly = sanitizeSlitPolygon(poly, p, 0.06, 0.16);
+            if (!poly) continue;
             collectedSlits.push(poly);
             allSlitData.push({ poly: poly, color: slitColor });
         }

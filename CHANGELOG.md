@@ -12,6 +12,10 @@ All notable changes to this project are documented in this file.
   - mask generation/export
   - FFT rendering/inspection
 - Updated default objective diameter to 203 mm
+- Hardened slit-rounding geometry for edge cases:
+  - convex-only fillets
+  - adaptive rounding fallback for unstable slit polygons
+  - interior-center / interior-arc validation to prevent outward fillet application on external slits
 
 ### Added
 
