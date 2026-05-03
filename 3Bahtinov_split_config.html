@@ -946,7 +946,11 @@ function drawMask() {
 
     var totalR = p.TDiam / 2;
     var vbSize = p.TDiam * 1.1;
-    svg.setAttribute('viewBox', (-vbSize/2) + ' ' + (-vbSize/2) + ' ' + vbSize + ' ' + vbSize);
+    var vbMinX = -vbSize / 2;
+    var topPadding = 4;
+    var vbMinY = -totalR - topPadding;
+    var vbMaxY = vbMinY + vbSize;
+    svg.setAttribute('viewBox', vbMinX + ' ' + vbMinY + ' ' + vbSize + ' ' + vbSize);
 
     // Set physical dimensions and DPI for SVG export
     // DPI = 96 (standard screen). SVG width/height define the real-world size.
@@ -1112,7 +1116,57 @@ function drawMask() {
         }
     }
 
-    // (Outer border and scale bar removed from SVG for clean selectable objects)
+    // Reference scale bar: full mask diameter with unit-aware label
+    var unitIsInches = (document.getElementById('units').value === 'inches');
+    var barLenMm = p.TDiam;
+    var labelValue = unitIsInches ? (p.TDiam / 25.4) : p.TDiam;
+    var labelUnit = unitIsInches ? 'in' : 'mm';
+    var labelText = labelValue.toFixed(unitIsInches ? 3 : 1).replace(/\.?0+$/, '') + ' ' + labelUnit;
+
+    var barX1 = -p.TDiam / 2;
+    var barX2 = p.TDiam / 2;
+    var freeBottom = vbMaxY - totalR;
+    var textY = totalR + freeBottom * 0.45;
+    var barY = totalR + freeBottom * 0.82;
+
+    svg.appendChild(createSvgElement('line', {
+        x1: barX1,
+        y1: barY,
+        x2: barX2,
+        y2: barY,
+        stroke: '#000000',
+        'stroke-width': 1.2,
+        'data-no-split-clip': '1'
+    }));
+    svg.appendChild(createSvgElement('line', {
+        x1: barX1,
+        y1: barY - 3,
+        x2: barX1,
+        y2: barY + 3,
+        stroke: '#000000',
+        'stroke-width': 1,
+        'data-no-split-clip': '1'
+    }));
+    svg.appendChild(createSvgElement('line', {
+        x1: barX2,
+        y1: barY - 3,
+        x2: barX2,
+        y2: barY + 3,
+        stroke: '#000000',
+        'stroke-width': 1,
+        'data-no-split-clip': '1'
+    }));
+    var scaleText = createSvgElement('text', {
+        x: (barX1 + barX2) / 2,
+        y: textY,
+        fill: '#000000',
+        'font-size': 5.6,
+        'font-weight': '700',
+        'text-anchor': 'middle',
+        'data-no-split-clip': '1'
+    });
+    scaleText.textContent = labelText;
+    svg.appendChild(scaleText);
 
     // ---- SPLIT FEATURE ----
     // If Split is enabled, clip entire mask to a circular sector from -60° to +60°
@@ -1142,12 +1196,22 @@ function drawMask() {
         var existingDefs = svg.querySelector('defs');
         existingDefs.appendChild(clipPathEl);
 
-        // Wrap all current svg children in a group with the clip
+        // Wrap mask content in a clipped group, but keep scale overlay visible
         var group = createSvgElement('g', { 'clip-path': 'url(#splitClip)' });
+        var preserved = [];
         while (svg.firstChild) {
-            group.appendChild(svg.firstChild);
+            var child = svg.firstChild;
+            svg.removeChild(child);
+            if (child.getAttribute && child.getAttribute('data-no-split-clip') === '1') {
+                preserved.push(child);
+            } else {
+                group.appendChild(child);
+            }
         }
         svg.appendChild(group);
+        for (var pi = 0; pi < preserved.length; pi++) {
+            svg.appendChild(preserved[pi]);
+        }
     }
 
     // Update SVG source textarea
