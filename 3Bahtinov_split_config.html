@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- TroBahtinov_configurable_Splittable - Release v1.0 | License: GPL-3.0-or-later -->
+<!-- TroBahtinov_configurable_Splittable - Release v1.1 | License: GPL-3.0-or-later -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -9,9 +9,13 @@
 body {
     font-family: Arial, sans-serif;
     font-size: 14px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #f0f0f0;
+}
+#mask-section {
     display: flex;
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
 }
 #svg-panel {
     flex: 3;
@@ -97,9 +101,129 @@ body {
     font-size: 11px;
     resize: vertical;
 }
+#section-divider {
+    width: 100%;
+    height: 6px;
+    background: #000;
+}
+#fft-section {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) 460px;
+    min-height: 100vh;
+}
+#fft-viewer {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+    background: #e6e6e6;
+}
+.fft-panel {
+    background: #fff;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+}
+.fft-panel h3 {
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+.fft-canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+}
+.fft-canvas-wrap canvas {
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid #999;
+    background: #000;
+}
+#fft-controls-panel {
+    overflow-y: auto;
+    padding: 22px;
+    background: #f5f5f5;
+    border-left: 1px solid #ccc;
+}
+.fft-field {
+    display: grid;
+    grid-template-columns: 1fr 140px;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.fft-field label {
+    font-size: 13px;
+}
+.fft-field input,
+.fft-field select {
+    width: 100%;
+    padding: 2px 4px;
+    font-size: 12px;
+}
+.fft-file-picker {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+.fft-file-picker button {
+    margin: 0;
+    padding: 6px 10px;
+}
+#fft-svg-name {
+    font-size: 12px;
+    color: #333;
+    word-break: break-all;
+}
+#fft-status {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #222;
+    min-height: 18px;
+}
+.fft-note {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #444;
+    line-height: 1.35;
+}
+.fft-guidance {
+    margin-top: 10px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    background: #fff;
+    font-size: 12px;
+    line-height: 1.35;
+}
+@media (max-width: 1100px) {
+    #mask-section,
+    #fft-section {
+        grid-template-columns: 1fr;
+        display: block;
+    }
+    #svg-panel,
+    #controls-panel,
+    #fft-controls-panel {
+        border-left: none;
+    }
+    #svg-panel {
+        min-height: 60vh;
+    }
+    #fft-viewer {
+        min-height: 78vh;
+    }
+}
 </style>
 </head>
 <body>
+
+<!-- MASK GENERATION SECTION (standalone removable block) -->
+<section id="mask-section">
 
 <!-- LEFT: SVG drawing area -->
 <div id="svg-panel">
@@ -126,7 +250,7 @@ body {
     </div>
     <div class="param-group">
         <label for="lensDiam">Lens diameter:</label>
-        <input type="text" id="lensDiam" value="205">
+        <input type="text" id="lensDiam" value="203">
     </div>
     <div class="param-group">
         <label for="tubeDiam">Tube/mask diameter:</label>
@@ -189,6 +313,8 @@ body {
         <label for="rounding">Rounding (slit width ratio):</label>
         <select id="rounding">
             <option value="0" selected>No</option>
+            <option value="0.9">0.9</option>
+            <option value="0.7">0.7</option>
             <option value="0.5">0.5</option>
             <option value="0.3">0.3</option>
             <option value="0.2">0.2</option>
@@ -230,6 +356,68 @@ body {
     <div id="svg-source-title">SVG source</div>
     <textarea id="svgSrc" readonly></textarea>
 </div>
+</section>
+
+<div id="section-divider"></div>
+
+<!-- FFT RENDERING SECTION (standalone removable block) -->
+<section id="fft-section">
+    <div id="fft-viewer">
+        <div class="fft-panel">
+            <h3>Focused Image FI (focal plane)</h3>
+            <div class="fft-canvas-wrap"><canvas id="fftFiCanvas" width="900" height="900"></canvas></div>
+        </div>
+        <div class="fft-panel">
+            <h3>FFT aperture approximation of the mask (may show resolution artifacts)</h3>
+            <div class="fft-canvas-wrap"><canvas id="fftMaskCanvas" width="700" height="700"></canvas></div>
+        </div>
+    </div>
+
+    <div id="fft-controls-panel">
+        <h2>Bahtinov FFT Rendering</h2>
+        <p class="desc">This star rendering is not fully realistic and should be used as a practical aid for choosing mask parameters.</p>
+
+        <div class="fft-field">
+            <label for="fftSourceMode">Mask source</label>
+            <select id="fftSourceMode">
+                <option value="svgText" selected>From mask above</option>
+                <option value="svgUpload">Uploaded SVG</option>
+            </select>
+        </div>
+        <div class="fft-field">
+            <label for="fftSvgFile">Upload SVG mask</label>
+            <div class="fft-file-picker">
+                <button type="button" id="btnChooseFftSvg">Choose file</button>
+                <input id="fftSvgFile" type="file" accept=".svg,image/svg+xml" style="display:none;">
+                <div id="fft-svg-name">No uploaded SVG selected.</div>
+            </div>
+        </div>
+
+        <div class="fft-field"><label for="fftWavelengthMode">Wavelength preset</label><select id="fftWavelengthMode"><option value="red">Red</option><option value="blue">Blue</option><option value="green" selected>Green</option><option value="rgb">RGB</option></select></div>
+        <div class="fft-field"><label for="fftGridSize">FFT grid size (pow2)</label><select id="fftGridSize"><option>512</option><option>1024</option><option selected>2048</option><option>4096</option></select></div>
+        <div class="fft-field"><label for="fftPadFactor">Aperture margin factor</label><input id="fftPadFactor" type="number" step="0.01" value="1"></div>
+        <div class="fft-field"><label for="fftMaskResMul">Mask resolution boost</label><select id="fftMaskResMul"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select></div>
+        <div class="fft-field"><label for="fftToneMode">Intensity mapping</label><select id="fftToneMode"><option value="linear" selected>linear</option><option value="log">logarithmic</option><option value="exp">exponential-lift</option></select></div>
+        <div class="fft-field"><label for="fftCut">Display gain (% central saturation)</label><input id="fftCut" type="number" step="0.0001" value="0.0001"></div>
+        <div class="fft-field"><label for="fftViewHalf">FFT half-view size</label><input id="fftViewHalf" type="number" step="0.001" value="3"></div>
+
+        <div class="buttons">
+            <button id="btnFftCompute">Compute FFT</button>
+            <button id="btnFftDownload">Download FI PNG</button>
+        </div>
+
+        <div id="fft-status"></div>
+        <div class="fft-note">FFT half-view size is the half-width shown from the FI center in the selected units.</div>
+
+        <div class="fft-guidance">
+            <strong>Practical parameter guide:</strong><br>
+            1) For clearer spikes: use logarithmic or exponential-lift mapping, and decrease display gain (for example 0.0001 to 0.01).<br>
+            2) For dense/thin slits (high Bahtinov factor): keep grid at 2048 or 4096 and raise mask resolution boost to 2x or 4x.<br>
+            3) If spikes look clipped or too close to center: increase FFT half-view size (for example 3 to 6).<br>
+            4) If the aperture looks too coarse: reduce aperture margin factor toward 1 and/or increase resolution boost.
+        </div>
+    </div>
+</section>
 
 <script>
 // ============================================================
@@ -238,7 +426,7 @@ body {
 var params = {
     FL: 1500,           // Focal length (mm)
     TDiam: 220,         // Tube/mask diameter (mm)
-    Diam: 205,          // Lens/objective diameter (mm)
+    Diam: 203,          // Lens/objective diameter (mm)
     Rh: 15,             // Central hole radius (mm)
     Rth: 5,             // Solid ring width (mm)
     SectorsStem_th: 6,  // Sector stem width (mm)
@@ -1829,16 +2017,505 @@ function downloadSTL_Scanline() {
 }
 
 // ============================================================
+// FFT RENDERING SECTION (standalone removable block)
+// ============================================================
+var fftState = {
+    sourceMode: 'svgText',
+    uploadedSvgText: null,
+    uploadedSvgName: '',
+    wavelengthMode: 'green',
+    gridSize: 2048,
+    padFactor: 1,
+    maskResMul: 2,
+    toneMode: 'linear',
+    cut: 0.0001,
+    viewHalf: 3,
+    lastFiCanvas: null
+};
+
+function fftSetStatus(msg) {
+    document.getElementById('fft-status').textContent = msg;
+}
+
+function fftReadUI() {
+    fftState.sourceMode = document.getElementById('fftSourceMode').value;
+    fftState.wavelengthMode = document.getElementById('fftWavelengthMode').value;
+    fftState.gridSize = parseInt(document.getElementById('fftGridSize').value, 10);
+    fftState.padFactor = Math.max(1, parseFloat(document.getElementById('fftPadFactor').value));
+    fftState.maskResMul = Math.max(1, parseInt(document.getElementById('fftMaskResMul').value, 10));
+    fftState.toneMode = document.getElementById('fftToneMode').value;
+    fftState.cut = Math.max(1e-8, parseFloat(document.getElementById('fftCut').value));
+    fftState.viewHalf = Math.max(0.001, parseFloat(document.getElementById('fftViewHalf').value));
+}
+
+function fftGetWavelengthSet() {
+    var map = {
+        red: [{ key: 'r', nm: 650 }],
+        green: [{ key: 'g', nm: 530 }],
+        blue: [{ key: 'b', nm: 460 }],
+        rgb: [
+            { key: 'r', nm: 650 },
+            { key: 'g', nm: 530 },
+            { key: 'b', nm: 460 }
+        ]
+    };
+    return map[fftState.wavelengthMode] || map.green;
+}
+
+function fftToneMap(g) {
+    if (fftState.toneMode === 'linear') return g;
+    if (fftState.toneMode === 'exp') return 1 - Math.exp(-6 * g);
+    return Math.log10(1 + g * 150000) / Math.log10(150001);
+}
+
+function fftParseSvgViewBox(svgText) {
+    var m = svgText.match(/viewBox\s*=\s*"([^"]+)"/i);
+    if (!m) {
+        var d = params.TDiam;
+        return { minX: -d / 2, minY: -d / 2, width: d, height: d };
+    }
+    var nums = m[1].trim().split(/\s+/).map(parseFloat);
+    if (nums.length !== 4 || nums.some(function(v) { return isNaN(v); })) {
+        var d2 = params.TDiam;
+        return { minX: -d2 / 2, minY: -d2 / 2, width: d2, height: d2 };
+    }
+    return { minX: nums[0], minY: nums[1], width: nums[2], height: nums[3] };
+}
+
+function fftLoadUploadedSvg(file) {
+    return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function() {
+            fftState.uploadedSvgText = reader.result;
+            fftState.uploadedSvgName = file.name;
+            document.getElementById('fft-svg-name').textContent = file.name;
+            resolve();
+        };
+        reader.onerror = function() { reject(new Error('Could not read SVG file.')); };
+        reader.readAsText(file);
+    });
+}
+
+function fftGetActiveSvgText() {
+    if (fftState.sourceMode === 'svgUpload') {
+        if (!fftState.uploadedSvgText) throw new Error('No uploaded SVG selected.');
+        return fftState.uploadedSvgText;
+    }
+    var txt = document.getElementById('svgSrc').value;
+    if (!txt || !txt.trim()) throw new Error('SVG source text is empty.');
+    return txt;
+}
+
+function fftRasterizeSvgToAperture(svgText, N, L) {
+    return new Promise(function(resolve, reject) {
+        var vb = fftParseSvgViewBox(svgText);
+        var img = new Image();
+        var blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+
+        img.onload = function() {
+            try {
+                var renderN = Math.min(8192, N * fftState.maskResMul);
+                var c = document.createElement('canvas');
+                c.width = renderN;
+                c.height = renderN;
+                var ctx = c.getContext('2d');
+                ctx.clearRect(0, 0, renderN, renderN);
+                ctx.drawImage(img, 0, 0, renderN, renderN);
+
+                var data = ctx.getImageData(0, 0, renderN, renderN).data;
+                var arr = new Float64Array(N * N);
+
+                var dx = L / N;
+                var half = N / 2;
+                var mirrorR = params.Diam / 2;
+
+                for (var iy = 0; iy < N; iy++) {
+                    var y = (iy - half + 0.5) * dx;
+                    for (var ix = 0; ix < N; ix++) {
+                        var x = (ix - half + 0.5) * dx;
+                        var r = Math.sqrt(x * x + y * y);
+                        var idx = iy * N + ix;
+
+                        if (r > mirrorR) {
+                            arr[idx] = 0;
+                            continue;
+                        }
+
+                        var u = (x - vb.minX) / vb.width;
+                        var v = ((-y) - vb.minY) / vb.height;
+                        if (u < 0 || u > 1 || v < 0 || v > 1) {
+                            arr[idx] = 0;
+                            continue;
+                        }
+
+                        var px = Math.max(0, Math.min(renderN - 1, Math.round(u * (renderN - 1))));
+                        var py = Math.max(0, Math.min(renderN - 1, Math.round(v * (renderN - 1))));
+                        var di = (py * renderN + px) * 4;
+                        var a = data[di + 3] / 255;
+                        var lum = (data[di] + data[di + 1] + data[di + 2]) / (255 * 3);
+
+                        // Opaque dark pixels are treated as blocked mask material.
+                        var blocked = (a > 0.85 && lum < 0.20) ? 1 : 0;
+                        arr[idx] = 1 - blocked;
+                    }
+                }
+
+                URL.revokeObjectURL(url);
+                resolve(arr);
+            } catch (err) {
+                URL.revokeObjectURL(url);
+                reject(err);
+            }
+        };
+
+        img.onerror = function() {
+            URL.revokeObjectURL(url);
+            reject(new Error('Failed to rasterize SVG source.'));
+        };
+
+        img.src = url;
+    });
+}
+
+function fftBitReverse(v, bits) {
+    var r = 0;
+    for (var i = 0; i < bits; i++) {
+        r = (r << 1) | (v & 1);
+        v >>= 1;
+    }
+    return r;
+}
+
+function fft1dInPlace(re, im) {
+    var n = re.length;
+    var levels = Math.round(Math.log2(n));
+    if ((1 << levels) !== n) throw new Error('FFT size must be power of two');
+
+    for (var i = 0; i < n; i++) {
+        var j = fftBitReverse(i, levels);
+        if (j > i) {
+            var tr = re[i]; re[i] = re[j]; re[j] = tr;
+            var ti = im[i]; im[i] = im[j]; im[j] = ti;
+        }
+    }
+
+    for (var size = 2; size <= n; size <<= 1) {
+        var half = size >> 1;
+        var step = -2 * Math.PI / size;
+        for (var i2 = 0; i2 < n; i2 += size) {
+            for (var j2 = 0; j2 < half; j2++) {
+                var k = i2 + j2;
+                var l = k + half;
+                var ang = step * j2;
+                var wr = Math.cos(ang), wi = Math.sin(ang);
+                var xr = re[l] * wr - im[l] * wi;
+                var xi = re[l] * wi + im[l] * wr;
+                re[l] = re[k] - xr;
+                im[l] = im[k] - xi;
+                re[k] += xr;
+                im[k] += xi;
+            }
+        }
+    }
+}
+
+function fft2d(re, im, N) {
+    var rowRe = new Float64Array(N), rowIm = new Float64Array(N);
+    var colRe = new Float64Array(N), colIm = new Float64Array(N);
+
+    for (var y = 0; y < N; y++) {
+        var off = y * N;
+        for (var x = 0; x < N; x++) {
+            rowRe[x] = re[off + x];
+            rowIm[x] = im[off + x];
+        }
+        fft1dInPlace(rowRe, rowIm);
+        for (var x2 = 0; x2 < N; x2++) {
+            re[off + x2] = rowRe[x2];
+            im[off + x2] = rowIm[x2];
+        }
+    }
+
+    for (var x3 = 0; x3 < N; x3++) {
+        for (var y2 = 0; y2 < N; y2++) {
+            var idx = y2 * N + x3;
+            colRe[y2] = re[idx];
+            colIm[y2] = im[idx];
+        }
+        fft1dInPlace(colRe, colIm);
+        for (var y3 = 0; y3 < N; y3++) {
+            var idx2 = y3 * N + x3;
+            re[idx2] = colRe[y3];
+            im[idx2] = colIm[y3];
+        }
+    }
+}
+
+function fftShiftIntensity(re, im, N) {
+    var out = new Float64Array(N * N);
+    var maxV = 0;
+    var half = N / 2;
+    for (var y = 0; y < N; y++) {
+        var sy = (y + half) % N;
+        for (var x = 0; x < N; x++) {
+            var sx = (x + half) % N;
+            var src = sy * N + sx;
+            var v = re[src] * re[src] + im[src] * im[src];
+            out[y * N + x] = v;
+            if (v > maxV) maxV = v;
+        }
+    }
+    return { intensity: out, max: maxV };
+}
+
+function fftBilinearAt(arr, N, x, y) {
+    if (x < 0 || y < 0 || x >= N - 1 || y >= N - 1) return 0;
+    var x0 = Math.floor(x), y0 = Math.floor(y);
+    var x1 = x0 + 1, y1 = y0 + 1;
+    var tx = x - x0, ty = y - y0;
+
+    var v00 = arr[y0 * N + x0];
+    var v10 = arr[y0 * N + x1];
+    var v01 = arr[y1 * N + x0];
+    var v11 = arr[y1 * N + x1];
+    var v0 = v00 + (v10 - v00) * tx;
+    var v1 = v01 + (v11 - v01) * tx;
+    return v0 + (v1 - v0) * ty;
+}
+
+function fftDrawMaskApprox(aperture, N, L) {
+    var c = document.getElementById('fftMaskCanvas');
+    var ctx = c.getContext('2d');
+    var img = ctx.createImageData(c.width, c.height);
+
+    var dx = L / N;
+    var half = N / 2;
+    var spanMm = params.TDiam * 1.05;
+    var halfSpan = spanMm / 2;
+
+    for (var py = 0; py < c.height; py++) {
+        var ymm = halfSpan - (py / (c.height - 1)) * spanMm;
+        var sy = half + ymm / dx;
+        for (var px = 0; px < c.width; px++) {
+            var xmm = -halfSpan + (px / (c.width - 1)) * spanMm;
+            var sx = half + xmm / dx;
+            var a = fftBilinearAt(aperture, N, sx, sy);
+            var col = a > 0.5 ? 255 : 0;
+            var idx = (py * c.width + px) * 4;
+            img.data[idx] = col;
+            img.data[idx + 1] = col;
+            img.data[idx + 2] = col;
+            img.data[idx + 3] = 255;
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+}
+
+function fftDrawFocal(channelData, N) {
+    var c = document.getElementById('fftFiCanvas');
+    var ctx = c.getContext('2d');
+    var w = c.width, h = c.height;
+    var img = ctx.createImageData(w, h);
+
+    var useInches = (document.getElementById('units').value === 'inches');
+    var viewHalfMm = fftState.viewHalf * (useInches ? 25.4 : 1);
+    var satFrac = Math.max(1e-12, fftState.cut / 100);
+    var cx = N / 2, cy = N / 2;
+    var rgbMode = (fftState.wavelengthMode === 'rgb');
+
+    var ch = {
+        r: null,
+        g: null,
+        b: null,
+        mono: null
+    };
+    for (var ci = 0; ci < channelData.length; ci++) {
+        var cd = channelData[ci];
+        if (rgbMode) ch[cd.key] = cd;
+        else ch.mono = cd;
+    }
+
+    for (var py = 0; py < h; py++) {
+        var fy = ((h - 1 - py) / (h - 1) * 2 - 1) * viewHalfMm;
+        for (var px = 0; px < w; px++) {
+            var fx = (px / (w - 1) * 2 - 1) * viewHalfMm;
+            var di = (py * w + px) * 4;
+
+            if (rgbMode) {
+                var rr = 0, gg = 0, bb = 0;
+                if (ch.r) {
+                    var sxr = cx + fx / ch.r.focalPitchMm;
+                    var syr = cy + fy / ch.r.focalPitchMm;
+                    var Ir = fftBilinearAt(ch.r.intensity, N, sxr, syr);
+                    var nr = ch.r.max > 0 ? Ir / ch.r.max : 0;
+                    rr = Math.max(0, Math.min(1, fftToneMap(Math.min(1, nr / satFrac))));
+                }
+                if (ch.g) {
+                    var sxg = cx + fx / ch.g.focalPitchMm;
+                    var syg = cy + fy / ch.g.focalPitchMm;
+                    var Ig = fftBilinearAt(ch.g.intensity, N, sxg, syg);
+                    var ng = ch.g.max > 0 ? Ig / ch.g.max : 0;
+                    gg = Math.max(0, Math.min(1, fftToneMap(Math.min(1, ng / satFrac))));
+                }
+                if (ch.b) {
+                    var sxb = cx + fx / ch.b.focalPitchMm;
+                    var syb = cy + fy / ch.b.focalPitchMm;
+                    var Ib = fftBilinearAt(ch.b.intensity, N, sxb, syb);
+                    var nb = ch.b.max > 0 ? Ib / ch.b.max : 0;
+                    bb = Math.max(0, Math.min(1, fftToneMap(Math.min(1, nb / satFrac))));
+                }
+                img.data[di] = Math.round(rr * 255);
+                img.data[di + 1] = Math.round(gg * 255);
+                img.data[di + 2] = Math.round(bb * 255);
+            } else {
+                var mono = ch.mono;
+                var sx = cx + fx / mono.focalPitchMm;
+                var sy = cy + fy / mono.focalPitchMm;
+                var I = fftBilinearAt(mono.intensity, N, sx, sy);
+                var n = mono.max > 0 ? I / mono.max : 0;
+                var m = fftToneMap(Math.min(1, n / satFrac));
+                var col = Math.max(0, Math.min(255, Math.round(m * 255)));
+                img.data[di] = col;
+                img.data[di + 1] = col;
+                img.data[di + 2] = col;
+            }
+            img.data[di + 3] = 255;
+        }
+    }
+
+    ctx.putImageData(img, 0, 0);
+    ctx.strokeStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.font = 'bold 18px Arial';
+
+    var barMm = viewHalfMm * 0.6;
+    var labelVal = useInches ? (barMm / 25.4) : barMm;
+    var unitLabel = useInches ? 'in' : 'mm';
+    var label = labelVal.toFixed(useInches ? 4 : 3).replace(/\.?0+$/, '') + ' ' + unitLabel;
+    var bx1 = 40;
+    var bx2 = 40 + Math.round((barMm / (2 * viewHalfMm)) * w);
+    var by = h - 36;
+    ctx.beginPath();
+    ctx.moveTo(bx1, by); ctx.lineTo(bx2, by);
+    ctx.moveTo(bx1, by - 7); ctx.lineTo(bx1, by + 7);
+    ctx.moveTo(bx2, by - 7); ctx.lineTo(bx2, by + 7);
+    ctx.stroke();
+    ctx.fillText(label, (bx1 + bx2) / 2 - ctx.measureText(label).width / 2, by - 10);
+
+    var waveSet = fftGetWavelengthSet();
+    var airyLabel;
+    if (waveSet.length === 1) {
+        var airyMm = 1.22 * (waveSet[0].nm * 1e-6) * params.FL / params.Diam;
+        airyLabel = 'Airy radius: ' + (useInches ? (airyMm / 25.4).toExponential(2) : airyMm.toFixed(5)) + ' ' + unitLabel;
+    } else {
+        var airyR = 1.22 * (650e-6) * params.FL / params.Diam;
+        var airyG = 1.22 * (530e-6) * params.FL / params.Diam;
+        var airyB = 1.22 * (460e-6) * params.FL / params.Diam;
+        airyLabel = 'Airy radius RGB: ' +
+            (useInches ? (airyR / 25.4).toExponential(2) : airyR.toFixed(5)) + '/' +
+            (useInches ? (airyG / 25.4).toExponential(2) : airyG.toFixed(5)) + '/' +
+            (useInches ? (airyB / 25.4).toExponential(2) : airyB.toFixed(5)) + ' ' + unitLabel;
+    }
+    ctx.font = '14px Arial';
+    ctx.fillText(airyLabel, 20, 24);
+    ctx.fillText('Display gain: white at ' + fftState.cut + '% of central max', 20, 44);
+    var modeText = (waveSet.length === 1) ? ('Wavelength: ' + waveSet[0].nm + ' nm') : 'Wavelength: RGB (650/530/460 nm)';
+    ctx.fillText(modeText + ' | Tone: ' + fftState.toneMode, 20, 64);
+}
+
+async function computeFFTSection() {
+    try {
+        readUI();
+        drawMask();
+        fftReadUI();
+
+        var N = fftState.gridSize;
+        var L = params.TDiam * fftState.padFactor;
+        var svgText = fftGetActiveSvgText();
+
+        fftSetStatus('Building FFT aperture...');
+        await new Promise(function(r) { setTimeout(r, 0); });
+
+        var aperture = await fftRasterizeSvgToAperture(svgText, N, L);
+        fftDrawMaskApprox(aperture, N, L);
+
+        var waveSet = fftGetWavelengthSet();
+        var modeName = waveSet.length === 1 ? ('single-channel ' + waveSet[0].nm + 'nm') : 'RGB 3-channel';
+        fftSetStatus('Running 2D FFT (' + N + 'x' + N + ', raster x' + fftState.maskResMul + ', ' + modeName + ')...');
+        await new Promise(function(r) { setTimeout(r, 0); });
+
+        var channels = [];
+        for (var wi = 0; wi < waveSet.length; wi++) {
+            var wv = waveSet[wi];
+            var re = new Float64Array(aperture);
+            var im = new Float64Array(N * N);
+            fft2d(re, im, N);
+            var shifted = fftShiftIntensity(re, im, N);
+            var focalPitchMm = (wv.nm * 1e-6) * params.FL / L;
+            channels.push({
+                key: wv.key,
+                nm: wv.nm,
+                intensity: shifted.intensity,
+                max: shifted.max,
+                focalPitchMm: focalPitchMm
+            });
+        }
+
+        fftDrawFocal(channels, N);
+        fftState.lastFiCanvas = document.getElementById('fftFiCanvas');
+
+        var fpMsg;
+        if (channels.length === 1) fpMsg = channels[0].focalPitchMm.toExponential(3);
+        else fpMsg = 'R ' + channels[0].focalPitchMm.toExponential(3) + ', G ' + channels[1].focalPitchMm.toExponential(3) + ', B ' + channels[2].focalPitchMm.toExponential(3);
+        fftSetStatus('Done. Aperture pitch = ' + (L / N).toFixed(4) + ' mm/pixel; focal pitch = ' + fpMsg + ' mm/pixel.');
+    } catch (e) {
+        fftSetStatus('Error: ' + e.message);
+    }
+}
+
+function downloadFftFi() {
+    if (!fftState.lastFiCanvas) return;
+    var a = document.createElement('a');
+    a.href = fftState.lastFiCanvas.toDataURL('image/png');
+    a.download = 'Bahtinov_FI.png';
+    a.click();
+}
+
+function initFFTUI() {
+    document.getElementById('btnChooseFftSvg').addEventListener('click', function() {
+        document.getElementById('fftSvgFile').click();
+    });
+
+    document.getElementById('fftSvgFile').addEventListener('change', async function(e) {
+        var f = e.target.files && e.target.files[0];
+        if (!f) return;
+        try {
+            await fftLoadUploadedSvg(f);
+            fftSetStatus('Uploaded SVG loaded: ' + f.name);
+        } catch (err) {
+            fftSetStatus('Error loading SVG: ' + err.message);
+        }
+    });
+
+    document.getElementById('btnFftCompute').addEventListener('click', computeFFTSection);
+    document.getElementById('btnFftDownload').addEventListener('click', downloadFftFi);
+}
+
+// ============================================================
 // INIT
 // ============================================================
 window.addEventListener('DOMContentLoaded', function() {
     initUI();
+    initFFTUI();
     // Compute and set default MHolesPos value
     updateDerived();
     var r_R4_out = params.Rh + params.Rth + params.slits_w2 + params.Rth + params.slits_w4;
     var defaultMHPos = (r_R4_out + params.TDiam / 2) / 2;
     document.getElementById('mountingHolePos').value = defaultMHPos.toFixed(1);
     onParamChange();
+    computeFFTSection();
 });
 </script>
 </body>
