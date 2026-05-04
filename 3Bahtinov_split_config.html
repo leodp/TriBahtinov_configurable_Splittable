@@ -245,19 +245,19 @@ body {
         </select>
     </div>
     <div class="param-group">
-        <label for="focalLength">Focal length:</label>
+        <label for="focalLength">Focal length [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="focalLength" value="1500">
     </div>
     <div class="param-group">
-        <label for="lensDiam">Lens diameter:</label>
+        <label for="lensDiam">Lens diameter [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="lensDiam" value="203">
     </div>
     <div class="param-group">
-        <label for="tubeDiam">Tube/mask diameter:</label>
+        <label for="tubeDiam">Tube/mask diameter [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="tubeDiam" value="220">
     </div>
     <div class="param-group">
-        <label for="centralHole">Central hole diam:</label>
+        <label for="centralHole">Central hole diam [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="centralHole" value="30">
     </div>
 
@@ -265,21 +265,7 @@ body {
 
     <div class="param-group">
         <label for="slitStemRatio">Slit/Stem ratio:</label>
-        <select id="slitStemRatio">
-            <option value="10">10</option>
-            <option value="7">7</option>
-            <option value="5">5</option>
-            <option value="4">4</option>
-            <option value="3">3</option>
-            <option value="2">2</option>
-            <option value="1.5" selected>1.5</option>
-            <option value="1">1</option>
-            <option value="0.7">0.7</option>
-            <option value="0.5">0.5</option>
-            <option value="0.3">0.3</option>
-            <option value="0.25">0.25</option>
-            <option value="0.2">0.2</option>
-        </select>
+        <input type="text" id="slitStemRatio" value="1">
     </div>
     <div class="param-group">
         <label for="slitsRatio">Slits rings ratio:</label>
@@ -302,48 +288,55 @@ body {
         <input type="text" id="offsetAngle" value="0">
     </div>
     <div class="param-group">
-        <label for="ringBorder">Rings borders:</label>
+        <label for="ringBorder">Rings borders [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="ringBorder" value="5">
     </div>
     <div class="param-group">
-        <label for="sectorBorder">Sectors borders:</label>
+        <label for="sectorBorder">Sectors borders [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="sectorBorder" value="6">
     </div>
     <div class="param-group">
         <label for="rounding">Rounding (slit width ratio):</label>
         <select id="rounding">
             <option value="0" selected>No</option>
-            <option value="0.9">0.9</option>
+            <option value="0.99">0.99</option>
             <option value="0.7">0.7</option>
             <option value="0.5">0.5</option>
             <option value="0.3">0.3</option>
             <option value="0.2">0.2</option>
-            <option value="0.15">0.15</option>
             <option value="0.1">0.1</option>
-            <option value="0.05">0.05</option>
         </select>
     </div>
 
-    <div class="section-title">Modifications &amp; export</div>
+    <div class="section-title">Mask modifications</div>
 
     <div class="param-group">
         <label for="splitMask">Split mask:</label>
         <input type="checkbox" id="splitMask">
     </div>
+
+    <div class="section-title">Mounting holes</div>
+
     <div class="param-group">
         <label for="mountingHoles">With Mounting holes?</label>
         <input type="checkbox" id="mountingHoles">
     </div>
     <div class="param-group">
-        <label for="mountingHoleSize">Mounting holes size:</label>
+        <label for="mountingHoleSize">Mounting holes size [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="mountingHoleSize" value="2.5">
     </div>
     <div class="param-group">
-        <label for="mountingHolePos">Mounting holes position:</label>
-        <input type="text" id="mountingHolePos" value="">
+        <label for="mountingHolePos">Mounting holes angle:</label>
+        <select id="mountingHolePos">
+            <option value="0" selected>0°</option>
+            <option value="60">60°</option>
+        </select>
     </div>
+
+    <div class="section-title">Export</div>
+
     <div class="param-group">
-        <label for="thickness3D">3D thickness:</label>
+        <label for="thickness3D">3D thickness [<span class="unit-length">mm</span>]:</label>
         <input type="text" id="thickness3D" value="3">
     </div>
 
@@ -398,7 +391,8 @@ body {
         <div class="fft-field"><label for="fftPadFactor">Aperture margin factor</label><input id="fftPadFactor" type="number" step="0.01" value="1"></div>
         <div class="fft-field"><label for="fftMaskResMul">Mask resolution boost</label><select id="fftMaskResMul"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select></div>
         <div class="fft-field"><label for="fftToneMode">Intensity mapping</label><select id="fftToneMode"><option value="linear" selected>linear</option><option value="log">logarithmic</option><option value="exp">exponential-lift</option></select></div>
-        <div class="fft-field"><label for="fftCut">Display gain (% central saturation)</label><input id="fftCut" type="number" step="0.0001" value="0.0001"></div>
+        <div class="fft-field"><label for="fftGain">Display gain (multiplier)</label><input id="fftGain" type="number" step="0.1" min="0" value="1"></div>
+        <div class="fft-field"><label for="fftPeakIntensity">Central peak intensity (arb.)</label><input id="fftPeakIntensity" type="text" readonly style="background:#f0f0f0;color:#333;"></div>
         <div class="fft-field"><label for="fftViewHalf">FFT half-view size</label><input id="fftViewHalf" type="number" step="0.001" value="3"></div>
 
         <div class="buttons">
@@ -434,14 +428,15 @@ var params = {
     As: 10,             // Bahtinov tilt angle (degrees)
     A_off: 0,           // Slits offset tilt (degrees)
     OF: 1,              // Order factor (1 or 3)
-    Sd_Sst_rat: 1.5,   // Slit/Stem ratio
+    Sd_Sst_rat: 1,    // Slit/Stem ratio
     SlitsRatio: 1,      // Slits rings ratio: slits_w4 = slits_w2 / SlitsRatio
     Rounding: 0,        // Rounding factor (0 = none)
     Split: false,       // Split mask for 3D printing
     Thickness3D: 3,     // 3D model thickness (mm)
     RHole: 2.5,         // Mounting hole radius (mm)
     WithMountingHoles: false,  // Enable mounting holes
-    MHolesPos: 0          // Mounting holes radial position (0 = auto center of R5)
+    MHolesPos: 0,         // Mounting holes radial position (0 = auto center of R5)
+    MHolesAngle: 0        // Mounting holes angular offset (0 or 60 degrees)
 };
 
 // Derived values (calculated in updateDerived)
@@ -476,15 +471,12 @@ function updateDerived() {
 
     // slits_d = slits_step / (1 + Sd_Sst_rat)
     p.slits_d = p.slits_step / (1 + p.Sd_Sst_rat);
-    // Validation: if slits_d >= slits_step, bump ratio
+    // Validation: if slits_d >= slits_step, double the ratio until valid
     if (p.slits_d >= p.slits_step) {
-        // Move to next larger ratio value
-        var ratios = [10, 7, 5, 4, 3, 2, 1.5, 1, 0.7, 0.5, 0.3, 0.25, 0.2];
-        var idx = ratios.indexOf(p.Sd_Sst_rat);
-        if (idx > 0) {
-            p.Sd_Sst_rat = ratios[idx - 1];
-            p.slits_d = p.slits_step / (1 + p.Sd_Sst_rat);
-        }
+        p.Sd_Sst_rat = p.Sd_Sst_rat * 2;
+        p.slits_d = p.slits_step / (1 + p.Sd_Sst_rat);
+        var ratioEl = document.getElementById('slitStemRatio');
+        if (ratioEl) ratioEl.value = p.Sd_Sst_rat;
     }
 
     derived.slits_step = p.slits_step;
@@ -545,249 +537,305 @@ function toHex2(v) { var h = v.toString(16); return h.length < 2 ? '0' + h : h; 
 // roundingRadius: the fillet radius
 // arcSegments: number of line segments per rounded corner arc
 // ============================================================
-function applyRounding(poly, roundingRadius, arcSegments) {
+// ============================================================
+// SLIT ROUNDING — Analytical Arc-Line Tangency (MA method)
+//
+// For corners where a straight slit edge meets a circular sector
+// boundary (inner or outer arc), the fillet center is placed at
+// the intersection of:
+//   1. The slit edge offset line (parallel to slit, at distance roundR inward)
+//   2. The arc offset circle (concentric with the sector arc, radius rArc ± roundR)
+// This gives an exact tangent circle without iteration.
+//
+// For stem corners (both edges straight), the fillet center is at
+// the intersection of the two offset lines.
+//
+// After computing all fillet centers, buildWithSkipping walks the
+// polygon and removes ALL vertices inside each fillet zone, replacing
+// the entire corner region with a smooth arc.
+// ============================================================
+
+// Walk polygon boundary from cornerIdx in direction dir (-1=back, +1=fwd).
+// Returns {point, dist, segA, segB, t} — closest point to center within maxWalk arc-length.
+// segA = index of segment start (near corner side), segB = far end.
+// t = parameter [0,1] of closest point on the segment.
+function closestOnSideEx(poly, cornerIdx, dir, center, maxWalk) {
+    var n = poly.length;
+    var first = (cornerIdx + dir + n) % n;
+    var best = { dist: Infinity, point: null, segA: cornerIdx, segB: first, t: 0 };
+    var walkD = 0, cur = cornerIdx;
+    for (var step = 0; step < n && walkD < maxWalk; step++) {
+        var next = (cur + dir + n) % n;
+        var sA = poly[cur], sB = poly[next];
+        var dx = sB[0] - sA[0], dy = sB[1] - sA[1];
+        var sLen = Math.sqrt(dx * dx + dy * dy);
+        if (sLen > 1e-12) {
+            var t = ((center[0] - sA[0]) * dx + (center[1] - sA[1]) * dy) / (sLen * sLen);
+            t = Math.max(0, Math.min(1, t));
+            var foot = [sA[0] + t * dx, sA[1] + t * dy];
+            var d = Math.sqrt((center[0] - foot[0]) * (center[0] - foot[0]) +
+                              (center[1] - foot[1]) * (center[1] - foot[1]));
+            if (d < best.dist) { best.dist = d; best.point = foot; best.segA = cur; best.segB = next; best.t = t; }
+            walkD += sLen;
+        }
+        cur = next;
+    }
+    if (!best.point) best.point = poly[cornerIdx].slice();
+    return best;
+}
+
+// Build rounded polygon with proper vertex skipping.
+// For each fillet center, walks backward/forward from the corner to locate
+// tangent points on the polygon boundary, marks all intermediate vertices
+// for removal, and replaces the entire zone with a fillet arc.
+function buildWithSkipping(poly, filletCenters, arcSegments) {
+    var n = poly.length;
+    var polyWinding = (polyArea(poly) >= 0) ? 1 : -1; // +1 = CCW, -1 = CW
+    // skipArr[j] = cornerIdx if vertex j should be skipped; -1 = keep
+    var skipArr = new Array(n);
+    for (var j = 0; j < n; j++) skipArr[j] = -1;
+    var filletArcs = {}; // cornerIdx → arc points array
+
+    for (var fi = 0; fi < filletCenters.length; fi++) {
+        var fc = filletCenters[fi];
+        if (!fc.ok) continue;
+        var ci = fc.cornerIdx;
+        var roundR = fc.r;
+        // M2 guarded behavior: reject centers outside polygon.
+        if (!pointInPolygon([fc.cx, fc.cy], poly)) continue;
+        // Walk far enough to find the tangent segment even for shallow-angle corners.
+        var mw = roundR * 5;
+
+        // Find tangent points on each side of the corner
+        var backTP = closestOnSideEx(poly, ci, -1, [fc.cx, fc.cy], mw);
+        var fwdTP  = closestOnSideEx(poly, ci, +1, [fc.cx, fc.cy], mw);
+        // M2 guarded behavior: distances to both sides must match fillet radius.
+        if (Math.abs(backTP.dist - roundR) > roundR * 0.3 ||
+            Math.abs(fwdTP.dist - roundR) > roundR * 0.3) continue;
+
+        // Compute fillet arc from backTP to fwdTP.
+        // The arc must go through the *corner vertex side* (inward), not the
+        // outside. We determine the correct sweep direction from the polygon
+        // winding and the cross product of the two tangent-point vectors
+        // relative to the fillet center.
+        var a0 = Math.atan2(backTP.point[1] - fc.cy, backTP.point[0] - fc.cx);
+        var a1 = Math.atan2(fwdTP.point[1] - fc.cy, fwdTP.point[0] - fc.cx);
+        var sw = a1 - a0;
+        while (sw > Math.PI) sw -= 2 * Math.PI;
+        while (sw < -Math.PI) sw += 2 * Math.PI;
+
+        // The corner vertex should be on the arc side. Check: the angle from
+        // center to corner vertex vs. the arc midpoint angle. If the corner is
+        // on the opposite side of the initial sweep, flip it.
+        var aCorner = Math.atan2(fc.v[1] - fc.cy, fc.v[0] - fc.cx);
+        var dCorner = aCorner - a0;
+        while (dCorner > Math.PI) dCorner -= 2 * Math.PI;
+        while (dCorner < -Math.PI) dCorner += 2 * Math.PI;
+        // dCorner and sw should have the same sign if the corner is on the arc side
+        if ((sw > 0 && dCorner < 0) || (sw < 0 && dCorner > 0)) {
+            sw = (sw > 0) ? sw - 2 * Math.PI : sw + 2 * Math.PI;
+        }
+
+        var pts = [];
+        for (var s = 0; s <= arcSegments; s++) {
+            var a = a0 + sw * s / arcSegments;
+            pts.push([fc.cx + roundR * Math.cos(a), fc.cy + roundR * Math.sin(a)]);
+        }
+
+        // Mark corner vertex for skipping only after fillet is validated.
+        skipArr[ci] = ci;
+
+        // Walk backward: skip all vertices between the corner and segB (the far end
+        // of the tangent segment). segB is kept. When the tangent is on the immediate
+        // segment from the corner, segB = ci-1 and the loop exits immediately. ✓
+        var cur = (ci - 1 + n) % n;
+        var safety = 0;
+        while (cur !== backTP.segB && cur !== ci && safety < n) {
+            skipArr[cur] = ci;
+            cur = (cur - 1 + n) % n;
+            safety++;
+        }
+        // Walk forward similarly.
+        cur = (ci + 1) % n;
+        safety = 0;
+        while (cur !== fwdTP.segB && cur !== ci && safety < n) {
+            skipArr[cur] = ci;
+            cur = (cur + 1) % n;
+            safety++;
+        }
+
+        filletArcs[ci] = pts;
+    }
+
+    // Build output: emit kept vertices + arc replacements at corner positions
+    var result = [];
+    for (var i = 0; i < n; i++) {
+        if (skipArr[i] >= 0) {
+            // Corner vertex itself → emit the fillet arc
+            if (skipArr[i] === i && filletArcs[i]) {
+                result.push.apply(result, filletArcs[i]);
+            }
+            // Intermediate vertex inside fillet zone → skip
+            continue;
+        }
+        result.push(poly[i]);
+    }
+    return result;
+}
+
+// Inward-pointing normal of edge pA→pB (toward polygon centroid).
+function inwardNormal(pA, pB, cent) {
+    var dx = pB[0] - pA[0], dy = pB[1] - pA[1];
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-12) return [0, 0];
+    dx /= len; dy /= len;
+    var nx = -dy, ny = dx;
+    var toC = [cent[0] - (pA[0] + pB[0]) / 2, cent[1] - (pA[1] + pB[1]) / 2];
+    if (nx * toC[0] + ny * toC[1] < 0) { nx = -nx; ny = -ny; }
+    return [nx, ny];
+}
+
+function applyRounding(poly, roundingRadius, arcSegments, tiltDeg, rInner, rOuter) {
     if (roundingRadius <= 0 || !poly || poly.length < 3) return poly;
     arcSegments = arcSegments || 12;
 
     var n = poly.length;
-    var COLLINEAR_THRESHOLD = 5 * Math.PI / 180; // 5° — vertices with less turn are "arc" vertices (lowered to catch stem/curve intersections)
+    var COLLINEAR_THRESHOLD = 5 * Math.PI / 180;
     var winding = (polyArea(poly) >= 0) ? 1 : -1;
+    var tiltRad = deg2rad(tiltDeg || 0);
+    var ax = Math.cos(tiltRad), ay = Math.sin(tiltRad); // slit direction
+    var px = -ay, py = ax;                               // slit edge normal
 
-    // Compute turning angle at each vertex
-    function turningAngle(i) {
-        var prev = poly[(i + n - 1) % n];
-        var curr = poly[i];
-        var next = poly[(i + 1) % n];
+    // Polygon centroid (for determining inward direction)
+    var centX = 0, centY = 0;
+    for (var i = 0; i < n; i++) { centX += poly[i][0]; centY += poly[i][1]; }
+    centX /= n; centY /= n;
+    var cent = [centX, centY];
+
+    // Identify convex corners
+    var corners = [];
+    for (var i = 0; i < n; i++) {
+        var prev = poly[(i + n - 1) % n], curr = poly[i], next = poly[(i + 1) % n];
         var d1x = prev[0] - curr[0], d1y = prev[1] - curr[1];
         var d2x = next[0] - curr[0], d2y = next[1] - curr[1];
-        var len1 = Math.sqrt(d1x * d1x + d1y * d1y);
-        var len2 = Math.sqrt(d2x * d2x + d2y * d2y);
-        if (len1 < 1e-9 || len2 < 1e-9) return 0;
-        var dot = (d1x * d2x + d1y * d2y) / (len1 * len2);
-        dot = Math.max(-1, Math.min(1, dot));
-        return Math.PI - Math.acos(dot);
+        var l1 = Math.sqrt(d1x * d1x + d1y * d1y);
+        var l2 = Math.sqrt(d2x * d2x + d2y * d2y);
+        if (l1 < 1e-9 || l2 < 1e-9) continue;
+        var ta = Math.PI - Math.acos(Math.max(-1, Math.min(1, (d1x * d2x + d1y * d2y) / (l1 * l2))));
+        if (Math.abs(ta) < COLLINEAR_THRESHOLD) continue;
+        var cross = (curr[0] - prev[0]) * (next[1] - curr[1]) - (curr[1] - prev[1]) * (next[0] - curr[0]);
+        if ((winding * cross) > 1e-9) corners.push({ idx: i, l1: l1, l2: l2, halfA: Math.acos(Math.max(-1, Math.min(1, (d1x * d2x + d1y * d2y) / (l1 * l2)))) * 0.5 });
     }
 
-    // Only round convex corners; rounding concave corners can create inward hooks.
-    function isConvexVertex(i) {
-        var prev = poly[(i + n - 1) % n];
-        var curr = poly[i];
-        var next = poly[(i + 1) % n];
-        var e1x = curr[0] - prev[0], e1y = curr[1] - prev[1];
-        var e2x = next[0] - curr[0], e2y = next[1] - curr[1];
-        var cross = e1x * e2y - e1y * e2x;
-        return (winding * cross) > 1e-9;
-    }
+    // Compute fillet centers using analytical arc-line tangency
+    var filletCenters = [];
+    for (var ci = 0; ci < corners.length; ci++) {
+        var cMeta = corners[ci];
+        var i = cMeta.idx;
+        var cu = poly[i];
+        var rUse = roundingRadius;
+        var rVert = Math.sqrt(cu[0] * cu[0] + cu[1] * cu[1]);
+        // Fixed 1.5 mm tolerance is sufficient: arc-polygon vertices lie within ~0.003 mm
+        // of the true arc radius. A proportional tolerance (∝ roundR) is far too large
+        // for wide slits and misclassifies stem corners as arc corners, causing h²<0 and
+        // silently skipping those corners, or producing holes when the center lands outside.
+        var onOuter = rOuter > 0 && Math.abs(rVert - rOuter) < 1.5;
+        var onInner = rInner > 0 && Math.abs(rVert - rInner) < 1.5;
 
-    // Mark significant vertices
-    var isSignificant = [];
-    for (var i = 0; i < n; i++) {
-        isSignificant.push(Math.abs(turningAngle(i)) > COLLINEAR_THRESHOLD && isConvexVertex(i));
-    }
+        if (onOuter || onInner) {
+            // --- ARC CORNER: slit edge meets circular sector boundary ---
+            // Offset circle: fillet center lies on a circle concentric with
+            // the sector arc, at radius (rArc - roundR) for outer arcs or
+            // (rArc + roundR) for inner arcs.
+            var rArc = onOuter ? rOuter : rInner;
+            var rC = onOuter ? (rOuter - rUse) : (rInner + rUse);
 
-    // Edge length between consecutive vertices
-    function edgeLen(i) {
-        var j = (i + 1) % n;
-        var dx = poly[j][0] - poly[i][0], dy = poly[j][1] - poly[i][1];
-        return Math.sqrt(dx * dx + dy * dy);
-    }
+            // Offset slit line: the slit edge through cu has normal (px,py).
+            // Signed distance from origin to slit line: D0 = cu · (px,py).
+            // Offset inward by roundingRadius toward polygon centroid.
+            var D0 = cu[0] * px + cu[1] * py;
+            var centSide = centX * px + centY * py;
+            var sign = (centSide > D0) ? 1 : -1;
+            var D = D0 + sign * rUse;
 
-    // Accumulated length from vertex i backward to previous significant vertex
-    function accumLenBack(i) {
-        var total = 0, idx = i;
-        for (var steps = 0; steps < n; steps++) {
-            var prevIdx = (idx + n - 1) % n;
-            total += edgeLen(prevIdx);
-            if (isSignificant[prevIdx] && prevIdx !== i) break;
-            idx = prevIdx;
-        }
-        return total;
-    }
+            // Intersect offset line (px·x + py·y = D) with offset circle (x²+y²=rC²).
+            // Since ||(px,py)||=1: solutions = (D·px ± h·py, D·py ∓ h·px)
+            // where h = sqrt(rC² - D²).
+            var h2 = rC * rC - D * D;
+            if (h2 >= 0) {
+                var h = Math.sqrt(h2);
+                var sol1 = [D * px + h * py, D * py - h * px];
+                var sol2 = [D * px - h * py, D * py + h * px];
 
-    // Accumulated length from vertex i forward to next significant vertex
-    function accumLenFwd(i) {
-        var total = 0, idx = i;
-        for (var steps = 0; steps < n; steps++) {
-            var nextIdx = (idx + 1) % n;
-            total += edgeLen(idx);
-            if (isSignificant[nextIdx] && nextIdx !== i) break;
-            idx = nextIdx;
-        }
-        return total;
-    }
+                // The two solutions differ only in their position along the slit direction.
+                // pointInPolygon selects the correct one; when it cannot distinguish them,
+                // the solution closer to the corner vertex is used.
+                var d1 = Math.sqrt((sol1[0] - cu[0]) * (sol1[0] - cu[0]) + (sol1[1] - cu[1]) * (sol1[1] - cu[1]));
+                var d2 = Math.sqrt((sol2[0] - cu[0]) * (sol2[0] - cu[0]) + (sol2[1] - cu[1]) * (sol2[1] - cu[1]));
+                var in1 = pointInPolygon(sol1, poly), in2 = pointInPolygon(sol2, poly);
+                var center;
+                if (in1 && !in2) center = sol1;
+                else if (in2 && !in1) center = sol2;
+                else center = (d1 < d2) ? sol1 : sol2;
 
-    // --- PASS 1: Compute tangentDist for each significant vertex ---
-    var tangentDists = new Array(n);
-    for (var i = 0; i < n; i++) {
-        tangentDists[i] = 0;
-        if (!isSignificant[i]) continue;
-
-        var prev = poly[(i + n - 1) % n];
-        var curr = poly[i];
-        var next = poly[(i + 1) % n];
-        var d1x = prev[0] - curr[0], d1y = prev[1] - curr[1];
-        var d2x = next[0] - curr[0], d2y = next[1] - curr[1];
-        var len1 = Math.sqrt(d1x * d1x + d1y * d1y);
-        var len2 = Math.sqrt(d2x * d2x + d2y * d2y);
-        if (len1 < 1e-9 || len2 < 1e-9) continue;
-
-        var u1x = d1x / len1, u1y = d1y / len1;
-        var u2x = d2x / len2, u2y = d2y / len2;
-        var dot = u1x * u2x + u1y * u2y;
-        dot = Math.max(-1, Math.min(1, dot));
-        var angle = Math.acos(dot);
-        var halfAngle = angle / 2;
-        if (Math.abs(Math.sin(halfAngle)) < 1e-9) continue;
-
-        var tangentDist = roundingRadius / Math.tan(halfAngle);
-        var availBack = accumLenBack(i);
-        var availFwd = accumLenFwd(i);
-        // Keep tangent points away from edge endpoints to avoid pinched arcs.
-        var maxDistBack = availBack * 0.80;
-        var maxDistFwd = availFwd * 0.80;
-        var maxDist = Math.min(maxDistBack, maxDistFwd);
-        if (tangentDist > maxDist) {
-            // Reduce fillet: move center inward so arc remains tangent
-            // to both edges. Recalculate effectiveR from the clamped tangentDist.
-            tangentDist = maxDist;
-        }
-        tangentDists[i] = tangentDist;
-    }
-
-    // --- PASS 2: For each non-significant vertex, check if it's consumed by a neighbor's fillet ---
-    // A non-significant vertex at index j is "consumed" if it falls within tangentDist
-    // of a significant vertex walking along the polygon edges.
-    var consumed = new Array(n);
-    for (var i = 0; i < n; i++) consumed[i] = false;
-
-    for (var i = 0; i < n; i++) {
-        if (!isSignificant[i] || tangentDists[i] <= 0) continue;
-        var td = tangentDists[i];
-
-        // Walk backward and mark consumed vertices
-        var dist = 0;
-        var idx = i;
-        for (var steps = 0; steps < n; steps++) {
-            var prevIdx = (idx + n - 1) % n;
-            dist += edgeLen(prevIdx);
-            if (isSignificant[prevIdx]) break;
-            if (dist <= td) consumed[prevIdx] = true;
-            else break;
-            idx = prevIdx;
+                // Accept arc-line center only when it is interior and tangent to both
+                // adjacent sides. Otherwise fall back to bisector for this corner.
+                var arcCenterOk = pointInPolygon(center, poly);
+                if (arcCenterOk) {
+                    var tw = rUse * 5;
+                    var tb = closestOnSideEx(poly, i, -1, center, tw);
+                    var tf = closestOnSideEx(poly, i, +1, center, tw);
+                    if (Math.abs(tb.dist - rUse) > rUse * 0.35 ||
+                        Math.abs(tf.dist - rUse) > rUse * 0.35) arcCenterOk = false;
+                }
+                if (arcCenterOk) {
+                    filletCenters.push({
+                        ok: true, cornerIdx: i, cx: center[0], cy: center[1],
+                        r: rUse, v: cu, method: 'arc-line'
+                    });
+                    continue; // skip stem-corner fallback
+                }
+            }
+            // h2 < 0: arc-line intersection has no solution; fall through to stem-corner method
         }
 
-        // Walk forward and mark consumed vertices
-        dist = 0;
-        idx = i;
-        for (var steps = 0; steps < n; steps++) {
-            var nextIdx = (idx + 1) % n;
-            dist += edgeLen(idx);
-            if (isSignificant[nextIdx]) break;
-            if (dist <= td) consumed[nextIdx] = true;
-            else break;
-            idx = nextIdx;
-        }
-    }
-
-    // --- PASS 3: Build result polygon ---
-    var result = [];
-
-    for (var i = 0; i < n; i++) {
-        // Skip consumed vertices (they're inside a fillet arc)
-        if (consumed[i]) continue;
-
-        // Non-significant, non-consumed vertices pass through
-        if (!isSignificant[i]) {
-            result.push(poly[i]);
-            continue;
-        }
-
-        var prev = poly[(i + n - 1) % n];
-        var curr = poly[i];
-        var next = poly[(i + 1) % n];
-
-        var d1x = prev[0] - curr[0], d1y = prev[1] - curr[1];
-        var d2x = next[0] - curr[0], d2y = next[1] - curr[1];
-        var len1 = Math.sqrt(d1x * d1x + d1y * d1y);
-        var len2 = Math.sqrt(d2x * d2x + d2y * d2y);
-
-        if (len1 < 1e-9 || len2 < 1e-9) { result.push(curr); continue; }
-
-        var u1x = d1x / len1, u1y = d1y / len1;
-        var u2x = d2x / len2, u2y = d2y / len2;
-        var dot = u1x * u2x + u1y * u2y;
-        dot = Math.max(-1, Math.min(1, dot));
-        var angle = Math.acos(dot);
-        var halfAngle = angle / 2;
-
-        if (Math.abs(Math.sin(halfAngle)) < 1e-9) { result.push(curr); continue; }
-
-        var tangentDist = tangentDists[i];
-        if (tangentDist <= 0) { result.push(curr); continue; }
-        var effectiveR = tangentDist * Math.tan(halfAngle);
-
-        // Tangent points
-        var t1x = curr[0] + u1x * tangentDist;
-        var t1y = curr[1] + u1y * tangentDist;
-        var t2x = curr[0] + u2x * tangentDist;
-        var t2y = curr[1] + u2y * tangentDist;
-
-        // Center of fillet circle
+        // --- STEM CORNER (or arc-corner fallback): both edges treated as straight lines ---
+        // Fillet center on the interior angle bisector at distance r/sin(halfAngle).
+        // This is more robust than the offset-lines method, which depends on centroid-based
+        // inward normals that can be wrong on concave slit polygons.
+        var prev = poly[(i + n - 1) % n], next = poly[(i + 1) % n];
+        var e1x = prev[0] - cu[0], e1y = prev[1] - cu[1];
+        var e1l = Math.sqrt(e1x * e1x + e1y * e1y);
+        if (e1l < 1e-9) continue;
+        var e2x = next[0] - cu[0], e2y = next[1] - cu[1];
+        var e2l = Math.sqrt(e2x * e2x + e2y * e2y);
+        if (e2l < 1e-9) continue;
+        var u1x = e1x / e1l, u1y = e1y / e1l;
+        var u2x = e2x / e2l, u2y = e2y / e2l;
         var bisX = u1x + u2x, bisY = u1y + u2y;
-        var bisLen = Math.sqrt(bisX * bisX + bisY * bisY);
-        if (bisLen < 1e-9) { result.push(curr); continue; }
-        bisX /= bisLen; bisY /= bisLen;
-        var centerDist = effectiveR / Math.sin(halfAngle);
-        var cAx = curr[0] + bisX * centerDist;
-        var cAy = curr[1] + bisY * centerDist;
-        var cBx = curr[0] - bisX * centerDist;
-        var cBy = curr[1] - bisY * centerDist;
+        var bisL = Math.sqrt(bisX * bisX + bisY * bisY);
+        if (bisL < 1e-9) continue;
+        bisX /= bisL; bisY /= bisL;
+        var sinHalf = Math.sin(cMeta.halfA);
+        if (sinHalf < 1e-9) continue;
+        var cDist = rUse / sinHalf;
+        // The bisector has two directions; pick the one closer to the centroid
+        // (the interior side). pointInPolygon is unreliable for centers near
+        // the polygon boundary.
+        var cA = [cu[0] + bisX * cDist, cu[1] + bisY * cDist];
+        var cB = [cu[0] - bisX * cDist, cu[1] - bisY * cDist];
+        var dA = (cA[0] - centX) * (cA[0] - centX) + (cA[1] - centY) * (cA[1] - centY);
+        var dB = (cB[0] - centX) * (cB[0] - centX) + (cB[1] - centY) * (cB[1] - centY);
+        var center = (dA < dB) ? cA : cB;
 
-        function minorArcForCenter(cx, cy) {
-            var a0 = Math.atan2(t1y - cy, t1x - cx);
-            var a1 = Math.atan2(t2y - cy, t2x - cx);
-            var sw = a1 - a0;
-            while (sw > Math.PI) sw -= 2 * Math.PI;
-            while (sw < -Math.PI) sw += 2 * Math.PI;
-            var amid = a0 + 0.5 * sw;
-            return {
-                cx: cx,
-                cy: cy,
-                start: a0,
-                sweep: sw,
-                mid: [cx + effectiveR * Math.cos(amid), cy + effectiveR * Math.sin(amid)]
-            };
-        }
-
-        var insideA = pointInPolygon([cAx, cAy], poly);
-        var insideB = pointInPolygon([cBx, cBy], poly);
-        var arcA = minorArcForCenter(cAx, cAy);
-        var arcB = minorArcForCenter(cBx, cBy);
-        var arcAInside = pointInPolygon(arcA.mid, poly);
-        var arcBInside = pointInPolygon(arcB.mid, poly);
-
-        var useArc = null;
-        if (insideA && arcAInside && !(insideB && arcBInside)) {
-            useArc = arcA;
-        } else if (insideB && arcBInside && !(insideA && arcAInside)) {
-            useArc = arcB;
-        } else if (insideA && arcAInside) {
-            useArc = arcA;
-        } else if (insideB && arcBInside) {
-            useArc = arcB;
-        } else {
-            result.push(curr);
-            continue;
-        }
-
-        for (var s = 0; s <= arcSegments; s++) {
-            var t = s / arcSegments;
-            var a2 = useArc.start + useArc.sweep * t;
-            result.push([useArc.cx + effectiveR * Math.cos(a2), useArc.cy + effectiveR * Math.sin(a2)]);
-        }
+        filletCenters.push({
+            ok: true, cornerIdx: i, cx: center[0], cy: center[1],
+            r: rUse, v: cu, method: 'bisector'
+        });
     }
 
-    return result;
+    // Build the rounded polygon using vertex-skipping
+    return buildWithSkipping(poly, filletCenters, arcSegments);
 }
 
 // ============================================================
@@ -922,28 +970,17 @@ function sanitizeSlitPolygon(poly, p, minAreaScale, minThicknessScale) {
     return cleaned;
 }
 
-function safeApplyRounding(poly, targetRadius, p) {
+function safeApplyRounding(poly, targetRadius, p, tiltDeg, rInner, rOuter) {
     if (!poly || poly.length < 3 || targetRadius <= 0) return poly;
 
     var base = sanitizeSlitPolygon(poly, p, 0.06, 0.16);
     if (!base) return null;
 
-    var baseArea = Math.abs(polyArea(base));
-    var r = targetRadius;
+    var rounded = applyRounding(base, targetRadius, 12, tiltDeg, rInner, rOuter);
+    var cleaned = sanitizeSlitPolygon(rounded, p, 0.08, 0.22);
+    if (cleaned) return cleaned;
 
-    // Try requested fillet first, then progressively relax until geometry is valid.
-    for (var it = 0; it < 10; it++) {
-        var rounded = applyRounding(base, r, 12);
-        var cleaned = sanitizeSlitPolygon(rounded, p, 0.08, 0.22);
-        if (cleaned) {
-            var a = Math.abs(polyArea(cleaned));
-            // Reject excessive collapse; this is where inward-bend artifacts start.
-            if (a >= baseArea * 0.55) return cleaned;
-        }
-        r *= 0.7;
-    }
-
-    // Keep original slit when high rounding would generate invalid geometry.
+    // Rounding produced invalid geometry — keep unrounded slit.
     return base;
 }
 
@@ -1279,6 +1316,58 @@ function splitPinchedPolygon(poly) {
 }
 
 // ============================================================
+// MOUNTING HOLE / SPLIT BOUNDARY HELPERS
+// ============================================================
+// Check if a mounting hole at angle mhAngleRad sits on a sector boundary (±60°).
+// Returns the boundary angle (±π/3) or null.
+function getMountingHoleBoundary(mhAngleRad) {
+    var a = mhAngleRad;
+    while (a > Math.PI) a -= 2 * Math.PI;
+    while (a < -Math.PI) a += 2 * Math.PI;
+    if (Math.abs(a - Math.PI / 3) < 0.02) return Math.PI / 3;
+    if (Math.abs(a + Math.PI / 3) < 0.02) return -Math.PI / 3;
+    return null;
+}
+
+// Generate arc-indent points for a mounting hole sitting on a sector boundary.
+// The arc follows the hole circle through the sector interior (toward 0°),
+// replacing the straight boundary line through the hole with a semicircular notch.
+// fromInnerToOuter: true = going from origin outward, false = going inward.
+function holeArcIndent(holeCx, holeCy, holeR, boundaryAngle, fromInnerToOuter) {
+    var bCos = Math.cos(boundaryAngle), bSin = Math.sin(boundaryAngle);
+    var rDist = Math.sqrt(holeCx * holeCx + holeCy * holeCy);
+    var ptInner = [(rDist - holeR) * bCos, (rDist - holeR) * bSin];
+    var ptOuter = [(rDist + holeR) * bCos, (rDist + holeR) * bSin];
+
+    var startPt = fromInnerToOuter ? ptInner : ptOuter;
+    var endPt   = fromInnerToOuter ? ptOuter : ptInner;
+    var startA  = Math.atan2(startPt[1] - holeCy, startPt[0] - holeCx);
+    var endA    = Math.atan2(endPt[1]   - holeCy, endPt[0]   - holeCx);
+
+    var sweep = endA - startA;
+    while (sweep >  Math.PI) sweep -= 2 * Math.PI;
+    while (sweep < -Math.PI) sweep += 2 * Math.PI;
+
+    // Ensure the arc passes through the sector interior (toward 0°)
+    var midA  = startA + sweep / 2;
+    var midPx = holeCx + holeR * Math.cos(midA);
+    var midPy = holeCy + holeR * Math.sin(midA);
+    var midAngle = Math.atan2(midPy, midPx);
+    if (midAngle < -Math.PI / 3 || midAngle > Math.PI / 3) {
+        sweep = sweep > 0 ? sweep - 2 * Math.PI : sweep + 2 * Math.PI;
+    }
+
+    var arcRes = 24;
+    var pts = [];
+    for (var ai = 0; ai <= arcRes; ai++) {
+        var t = ai / arcRes;
+        var a = startA + sweep * t;
+        pts.push([holeCx + holeR * Math.cos(a), holeCy + holeR * Math.sin(a)]);
+    }
+    return pts;
+}
+
+// ============================================================
 // MASK DRAWING
 // ============================================================
 // Stores all slit polygons (in math coords, y-up) for 3D export
@@ -1351,7 +1440,7 @@ function drawMask() {
                                          r_R1_outer, r_R2_outer, stemHalfW);
         for (var j = 0; j < slits.length; j++) {
             var poly = slits[j];
-            if (roundR > 0) poly = safeApplyRounding(poly, roundR, p);
+            if (roundR > 0) poly = safeApplyRounding(poly, roundR, p, tilt, r_R1_outer, r_R2_outer);
             poly = sanitizeSlitPolygon(poly, p, 0.06, 0.16);
             if (!poly) continue;
             collectedSlits.push(poly);
@@ -1381,7 +1470,7 @@ function drawMask() {
                                          r_R3_outer, r_R4_outer, stemHalfW);
         for (var j = 0; j < slits.length; j++) {
             var poly = slits[j];
-            if (roundR > 0) poly = safeApplyRounding(poly, roundR, p);
+            if (roundR > 0) poly = safeApplyRounding(poly, roundR, p, sub.tilt, r_R3_outer, r_R4_outer);
             poly = sanitizeSlitPolygon(poly, p, 0.06, 0.16);
             if (!poly) continue;
             collectedSlits.push(poly);
@@ -1414,12 +1503,13 @@ function drawMask() {
         if (slitPathD) exclusionD += slitPathD;
     }
 
-    // Add mounting holes to the exclusion path
+    // Add mounting holes to the exclusion path (always full circles;
+    // boundary holes are handled by indenting the split clip path)
     var mountingHoleCenters = [];
     if (p.WithMountingHoles && p.RHole > 0) {
         var r5CenterR = (p.MHolesPos > 0) ? p.MHolesPos : (r_R4_outer + totalR) / 2;
         for (var mhi = 0; mhi < 3; mhi++) {
-            var mhAngle = mhi * 120 * Math.PI / 180;
+            var mhAngle = (mhi * 120 + (p.MHolesAngle || 0)) * Math.PI / 180;
             var mhCx = r5CenterR * Math.cos(mhAngle);
             var mhCy = r5CenterR * Math.sin(mhAngle);
             mountingHoleCenters.push([mhCx, mhCy]);
@@ -1522,13 +1612,46 @@ function drawMask() {
     // If Split is enabled, clip entire mask to a circular sector from -60° to +60°
     if (p.Split) {
         var clipR = totalR + 1;
-        // Build pie wedge polygon: center + arc from -60° to +60°
         var splitArcRes = 60;
+
+        // Detect mounting holes sitting on sector boundaries
+        var negBoundaryHole = null, posBoundaryHole = null;
+        if (p.WithMountingHoles && p.RHole > 0) {
+            var r5CR = (p.MHolesPos > 0) ? p.MHolesPos : (r_R4_outer + totalR) / 2;
+            for (var mhi = 0; mhi < 3; mhi++) {
+                var mhA = (mhi * 120 + (p.MHolesAngle || 0)) * Math.PI / 180;
+                var bnd = getMountingHoleBoundary(mhA);
+                if (bnd !== null) {
+                    var hcx = r5CR * Math.cos(mhA), hcy = r5CR * Math.sin(mhA);
+                    if (bnd > 0) posBoundaryHole = {cx: hcx, cy: hcy, r: p.RHole};
+                    else         negBoundaryHole = {cx: hcx, cy: hcy, r: p.RHole};
+                }
+            }
+        }
+
+        // Build pie wedge with semicircular indents at boundary holes
         var splitPoly = [[0, 0]];
+
+        // Left edge (from center toward -60°) — indent if hole on this boundary
+        if (negBoundaryHole) {
+            var arcPts = holeArcIndent(negBoundaryHole.cx, negBoundaryHole.cy,
+                                       negBoundaryHole.r, -Math.PI / 3, true);
+            for (var ai = 0; ai < arcPts.length; ai++) splitPoly.push(arcPts[ai]);
+        }
+
+        // Outer arc from -60° to +60°
         for (var i = 0; i <= splitArcRes; i++) {
             var a = deg2rad(-60 + (120 * i / splitArcRes));
             splitPoly.push([clipR * Math.cos(a), clipR * Math.sin(a)]);
         }
+
+        // Right edge (from +60° back to center) — indent if hole on this boundary
+        if (posBoundaryHole) {
+            var arcPts = holeArcIndent(posBoundaryHole.cx, posBoundaryHole.cy,
+                                       posBoundaryHole.r, Math.PI / 3, false);
+            for (var ai = 0; ai < arcPts.length; ai++) splitPoly.push(arcPts[ai]);
+        }
+
         splitPoly.push([0, 0]);
 
         // Convert to SVG coords (negate y)
@@ -1593,8 +1716,8 @@ function readUI() {
     params.Split = document.getElementById('splitMask').checked;
     params.WithMountingHoles = document.getElementById('mountingHoles').checked;
     params.RHole = parseFloat(document.getElementById('mountingHoleSize').value) * unitFactor;
-    params.MHolesPos = parseFloat(document.getElementById('mountingHolePos').value) * unitFactor;
-    if (isNaN(params.MHolesPos) || params.MHolesPos <= 0) params.MHolesPos = 0;
+    params.MHolesPos = 0; // radial position auto (center of R5)
+    params.MHolesAngle = parseFloat(document.getElementById('mountingHolePos').value) || 0;
 }
 
 function onParamChange() {
@@ -1639,13 +1762,11 @@ function handleUnitChange() {
             var el = document.getElementById(id);
             el.value = (parseFloat(el.value) * factor).toFixed(4).replace(/\.?0+$/, '');
         });
-        // Handle mountingHolePos separately (may be empty)
-        var mhpEl = document.getElementById('mountingHolePos');
-        if (mhpEl.value.trim() !== '' && !isNaN(parseFloat(mhpEl.value))) {
-            mhpEl.value = (parseFloat(mhpEl.value) * factor).toFixed(4).replace(/\.?0+$/, '');
-        }
     }
     previousUnit = newUnit;
+    document.querySelectorAll('.unit-length').forEach(function(el) {
+        el.textContent = (newUnit === 'inches') ? 'in' : 'mm';
+    });
     onParamChange();
 }
 
@@ -1843,16 +1964,19 @@ function generateSTL() {
         }
     }
 
-    // Mounting holes
+    // Mounting holes — track which are on sector boundaries
+    var boundaryMH = {};
     if (p.WithMountingHoles && p.RHole > 0) {
         var r5CenterR = (p.MHolesPos > 0) ? p.MHolesPos : (derived.r_R4_outer + p.TDiam / 2) / 2;
         var mhRes = Math.max(24, Math.round(circleRes * p.RHole / (p.TDiam / 2)));
         for (var mhi = 0; mhi < 3; mhi++) {
-            var mhAngle = mhi * 120 * Math.PI / 180;
+            var mhAngle = (mhi * 120 + (p.MHolesAngle || 0)) * Math.PI / 180;
             var mhCx = r5CenterR * Math.cos(mhAngle);
             var mhCy = r5CenterR * Math.sin(mhAngle);
             var mhPoly = makeCirclePoly(mhCx, mhCy, p.RHole, mhRes);
+            var idx = allHoles.length;
             allHoles.push(ensureCW(mhPoly));
+            if (getMountingHoleBoundary(mhAngle) !== null) boundaryMH[idx] = true;
         }
     }
 
@@ -1861,19 +1985,46 @@ function generateSTL() {
         var splitRes = 60;
         var totalR_val = p.TDiam / 2;
 
-        // Build annular sector outer polygon
+        // Detect boundary mounting holes for sector indent
+        var negBH = null, posBH = null;
+        if (p.WithMountingHoles && p.RHole > 0) {
+            var r5CR = (p.MHolesPos > 0) ? p.MHolesPos : (derived.r_R4_outer + p.TDiam / 2) / 2;
+            for (var mhi = 0; mhi < 3; mhi++) {
+                var mhA = (mhi * 120 + (p.MHolesAngle || 0)) * Math.PI / 180;
+                var bnd = getMountingHoleBoundary(mhA);
+                if (bnd !== null) {
+                    var hcx = r5CR * Math.cos(mhA), hcy = r5CR * Math.sin(mhA);
+                    if (bnd > 0) posBH = {cx: hcx, cy: hcy, r: p.RHole};
+                    else         negBH = {cx: hcx, cy: hcy, r: p.RHole};
+                }
+            }
+        }
+
+        // Build annular sector with semicircular indents at boundary holes
         var annularSector = [];
+        // Outer arc: -60° to +60°
         for (var i = 0; i <= splitRes; i++) {
             var a = deg2rad(-60 + (120 * i / splitRes));
             annularSector.push([totalR_val * Math.cos(a), totalR_val * Math.sin(a)]);
         }
+        // Right radial edge (+60°, outer→inner) with possible indent
+        if (posBH) {
+            var arcPts = holeArcIndent(posBH.cx, posBH.cy, posBH.r, Math.PI / 3, false);
+            for (var ai = 0; ai < arcPts.length; ai++) annularSector.push(arcPts[ai]);
+        }
+        // Inner arc: +60° to -60°
         for (var i = splitRes; i >= 0; i--) {
             var a = deg2rad(-60 + (120 * i / splitRes));
             annularSector.push([p.Rh * Math.cos(a), p.Rh * Math.sin(a)]);
         }
+        // Left radial edge (-60°, inner→outer) with possible indent
+        if (negBH) {
+            var arcPts = holeArcIndent(negBH.cx, negBH.cy, negBH.r, -Math.PI / 3, true);
+            for (var ai = 0; ai < arcPts.length; ai++) annularSector.push(arcPts[ai]);
+        }
         outerPoly = ensureCCW(annularSector);
 
-        // Remove central hole; clip remaining holes to sector
+        // Clip non-central, non-boundary holes to sector
         var clipR = totalR_val + 1;
         var sectorClip = [[0, 0]];
         for (var i = 0; i <= splitRes; i++) {
@@ -1884,16 +2035,18 @@ function generateSTL() {
         var filteredHoles = [];
         for (var i = 0; i < allHoles.length; i++) {
             var hp = allHoles[i];
+            // Skip central hole (handled by annular sector inner arc)
             var isCentralHole = true;
             for (var j = 0; j < hp.length; j++) {
                 var d = Math.sqrt(hp[j][0] * hp[j][0] + hp[j][1] * hp[j][1]);
                 if (Math.abs(d - p.Rh) > 1) { isCentralHole = false; break; }
             }
-            if (!isCentralHole) {
-                var clipped = sutherlandHodgman(hp, sectorClip);
-                if (clipped && clipped.length >= 3) {
-                    filteredHoles.push(ensureCW(clipped));
-                }
+            if (isCentralHole) continue;
+            // Skip boundary mounting holes (handled by annular sector indent)
+            if (boundaryMH[i]) continue;
+            var clipped = sutherlandHodgman(hp, sectorClip);
+            if (clipped && clipped.length >= 3) {
+                filteredHoles.push(ensureCW(clipped));
             }
         }
         allHoles = filteredHoles;
@@ -2074,13 +2227,16 @@ function generateSTL_Scanline() {
     for (var i = 0; i < collectedSlits.length; i++) {
         if (collectedSlits[i].length >= 3) allHoles.push(ensureCW(collectedSlits[i]));
     }
+    var boundaryMH = {};
     if (p.WithMountingHoles && p.RHole > 0) {
         var r5CenterR = (p.MHolesPos > 0) ? p.MHolesPos : (derived.r_R4_outer + p.TDiam / 2) / 2;
         var mhRes = Math.max(24, Math.round(circleRes * p.RHole / (p.TDiam / 2)));
         for (var mhi = 0; mhi < 3; mhi++) {
-            var mhAngle = mhi * 120 * Math.PI / 180;
+            var mhAngle = (mhi * 120 + (p.MHolesAngle || 0)) * Math.PI / 180;
+            var idx = allHoles.length;
             allHoles.push(ensureCW(makeCirclePoly(
                 r5CenterR * Math.cos(mhAngle), r5CenterR * Math.sin(mhAngle), p.RHole, mhRes)));
+            if (getMountingHoleBoundary(mhAngle) !== null) boundaryMH[idx] = true;
         }
     }
 
@@ -2088,17 +2244,43 @@ function generateSTL_Scanline() {
     if (p.Split) {
         var splitRes = 60;
         var totalR_val = p.TDiam / 2;
+
+        // Detect boundary mounting holes for sector indent
+        var negBH = null, posBH = null;
+        if (p.WithMountingHoles && p.RHole > 0) {
+            var r5CR = (p.MHolesPos > 0) ? p.MHolesPos : (derived.r_R4_outer + p.TDiam / 2) / 2;
+            for (var mhi = 0; mhi < 3; mhi++) {
+                var mhA = (mhi * 120 + (p.MHolesAngle || 0)) * Math.PI / 180;
+                var bnd = getMountingHoleBoundary(mhA);
+                if (bnd !== null) {
+                    var hcx = r5CR * Math.cos(mhA), hcy = r5CR * Math.sin(mhA);
+                    if (bnd > 0) posBH = {cx: hcx, cy: hcy, r: p.RHole};
+                    else         negBH = {cx: hcx, cy: hcy, r: p.RHole};
+                }
+            }
+        }
+
+        // Build annular sector with semicircular indents at boundary holes
         var annularSector = [];
         for (var i = 0; i <= splitRes; i++) {
             var a = deg2rad(-60 + (120 * i / splitRes));
             annularSector.push([totalR_val * Math.cos(a), totalR_val * Math.sin(a)]);
         }
+        if (posBH) {
+            var arcPts = holeArcIndent(posBH.cx, posBH.cy, posBH.r, Math.PI / 3, false);
+            for (var ai = 0; ai < arcPts.length; ai++) annularSector.push(arcPts[ai]);
+        }
         for (var i = splitRes; i >= 0; i--) {
             var a = deg2rad(-60 + (120 * i / splitRes));
             annularSector.push([p.Rh * Math.cos(a), p.Rh * Math.sin(a)]);
         }
+        if (negBH) {
+            var arcPts = holeArcIndent(negBH.cx, negBH.cy, negBH.r, -Math.PI / 3, true);
+            for (var ai = 0; ai < arcPts.length; ai++) annularSector.push(arcPts[ai]);
+        }
         outerPoly = ensureCCW(annularSector);
 
+        // Clip non-central, non-boundary holes to sector
         var clipR = totalR_val + 1;
         var sectorClip = [[0, 0]];
         for (var i = 0; i <= splitRes; i++) {
@@ -2113,10 +2295,10 @@ function generateSTL_Scanline() {
                 var d = Math.sqrt(hp[j][0] * hp[j][0] + hp[j][1] * hp[j][1]);
                 if (Math.abs(d - p.Rh) > 1) { isCentralHole = false; break; }
             }
-            if (!isCentralHole) {
-                var clipped = sutherlandHodgman(hp, sectorClip);
-                if (clipped && clipped.length >= 3) filteredHoles.push(ensureCW(clipped));
-            }
+            if (isCentralHole) continue;
+            if (boundaryMH[i]) continue;
+            var clipped = sutherlandHodgman(hp, sectorClip);
+            if (clipped && clipped.length >= 3) filteredHoles.push(ensureCW(clipped));
         }
         allHoles = filteredHoles;
     }
@@ -2190,7 +2372,14 @@ var fftState = {
     padFactor: 1,
     maskResMul: 2,
     toneMode: 'linear',
-    cut: 0.0001,
+    // normRef = openPixels^2, frozen on first FFT run so that subsequent
+    // mask changes (e.g. slit/stem ratio) produce visible brightness change.
+    // satBias = 1e-6 replicates old default brightness (cut=0.0001%).
+    // pixel brightness = toneMap(min(1, I * gain / (normRef * satBias)))
+    normRef: 1,
+    normRefFrozen: false,
+    satBias: 1e-6,
+    gain: 1,
     viewHalf: 3,
     lastFiCanvas: null
 };
@@ -2206,7 +2395,7 @@ function fftReadUI() {
     fftState.padFactor = Math.max(1, parseFloat(document.getElementById('fftPadFactor').value));
     fftState.maskResMul = Math.max(1, parseInt(document.getElementById('fftMaskResMul').value, 10));
     fftState.toneMode = document.getElementById('fftToneMode').value;
-    fftState.cut = Math.max(1e-8, parseFloat(document.getElementById('fftCut').value));
+    fftState.gain = Math.max(0, parseFloat(document.getElementById('fftGain').value) || 1);
     fftState.viewHalf = Math.max(0.001, parseFloat(document.getElementById('fftViewHalf').value));
 }
 
@@ -2482,7 +2671,8 @@ function fftDrawFocal(channelData, N) {
 
     var useInches = (document.getElementById('units').value === 'inches');
     var viewHalfMm = fftState.viewHalf * (useInches ? 25.4 : 1);
-    var satFrac = Math.max(1e-12, fftState.cut / 100);
+    var fRef = Math.max(1, fftState.normRef) * (fftState.satBias || 1e-6);
+    var gain = Math.max(1e-30, fftState.gain);
     var cx = N / 2, cy = N / 2;
     var rgbMode = (fftState.wavelengthMode === 'rgb');
 
@@ -2510,22 +2700,22 @@ function fftDrawFocal(channelData, N) {
                     var sxr = cx + fx / ch.r.focalPitchMm;
                     var syr = cy + fy / ch.r.focalPitchMm;
                     var Ir = fftBilinearAt(ch.r.intensity, N, sxr, syr);
-                    var nr = ch.r.max > 0 ? Ir / ch.r.max : 0;
-                    rr = Math.max(0, Math.min(1, fftToneMap(Math.min(1, nr / satFrac))));
+                    var nr = Ir * gain / fRef;
+                    rr = Math.max(0, Math.min(1, fftToneMap(Math.min(1, nr))));
                 }
                 if (ch.g) {
                     var sxg = cx + fx / ch.g.focalPitchMm;
                     var syg = cy + fy / ch.g.focalPitchMm;
                     var Ig = fftBilinearAt(ch.g.intensity, N, sxg, syg);
-                    var ng = ch.g.max > 0 ? Ig / ch.g.max : 0;
-                    gg = Math.max(0, Math.min(1, fftToneMap(Math.min(1, ng / satFrac))));
+                    var ng = Ig * gain / fRef;
+                    gg = Math.max(0, Math.min(1, fftToneMap(Math.min(1, ng))));
                 }
                 if (ch.b) {
                     var sxb = cx + fx / ch.b.focalPitchMm;
                     var syb = cy + fy / ch.b.focalPitchMm;
                     var Ib = fftBilinearAt(ch.b.intensity, N, sxb, syb);
-                    var nb = ch.b.max > 0 ? Ib / ch.b.max : 0;
-                    bb = Math.max(0, Math.min(1, fftToneMap(Math.min(1, nb / satFrac))));
+                    var nb = Ib * gain / fRef;
+                    bb = Math.max(0, Math.min(1, fftToneMap(Math.min(1, nb))));
                 }
                 img.data[di] = Math.round(rr * 255);
                 img.data[di + 1] = Math.round(gg * 255);
@@ -2535,8 +2725,8 @@ function fftDrawFocal(channelData, N) {
                 var sx = cx + fx / mono.focalPitchMm;
                 var sy = cy + fy / mono.focalPitchMm;
                 var I = fftBilinearAt(mono.intensity, N, sx, sy);
-                var n = mono.max > 0 ? I / mono.max : 0;
-                var m = fftToneMap(Math.min(1, n / satFrac));
+                var n = I * gain / fRef;
+                var m = fftToneMap(Math.min(1, n));
                 var col = Math.max(0, Math.min(255, Math.round(m * 255)));
                 img.data[di] = col;
                 img.data[di + 1] = col;
@@ -2582,7 +2772,8 @@ function fftDrawFocal(channelData, N) {
     }
     ctx.font = '14px Arial';
     ctx.fillText(airyLabel, 20, 24);
-    ctx.fillText('Display gain: white at ' + fftState.cut + '% of central max', 20, 44);
+    var peakIntensity = channelData.length > 0 ? channelData[0].max / Math.max(1, fftState.normRef) : 0;
+    ctx.fillText('Display gain: ' + fftState.gain + ' | Peak intensity: ' + peakIntensity.toExponential(3), 20, 44);
     var modeText = (waveSet.length === 1) ? ('Wavelength: ' + waveSet[0].nm + ' nm') : 'Wavelength: RGB (650/530/460 nm)';
     ctx.fillText(modeText + ' | Tone: ' + fftState.toneMode, 20, 64);
 }
@@ -2601,6 +2792,18 @@ async function computeFFTSection() {
         await new Promise(function(r) { setTimeout(r, 0); });
 
         var aperture = await fftRasterizeSvgToAperture(svgText, N, L);
+
+        // Count open aperture pixels for fixed (mask-independent) normalization
+        var openPixels = 0;
+        for (var ai = 0; ai < aperture.length; ai++) { if (aperture[ai] > 0.5) openPixels++; }
+        // Freeze normRef on first computation so that changing mask params
+        // (e.g. slit/stem ratio) produces a visible change in brightness
+        // and in the peak intensity readout.
+        if (!fftState.normRefFrozen) {
+            fftState.normRef = openPixels > 0 ? openPixels * openPixels : 1;
+            fftState.normRefFrozen = true;
+        }
+
         fftDrawMaskApprox(aperture, N, L);
 
         var waveSet = fftGetWavelengthSet();
@@ -2627,6 +2830,12 @@ async function computeFFTSection() {
 
         fftDrawFocal(channels, N);
         fftState.lastFiCanvas = document.getElementById('fftFiCanvas');
+
+        // Update central peak intensity readout
+        var peakEl = document.getElementById('fftPeakIntensity');
+        if (peakEl && channels.length > 0) {
+            peakEl.value = (channels[0].max / Math.max(1, fftState.normRef)).toExponential(3);
+        }
 
         var fpMsg;
         if (channels.length === 1) fpMsg = channels[0].focalPitchMm.toExponential(3);
@@ -2671,11 +2880,7 @@ function initFFTUI() {
 window.addEventListener('DOMContentLoaded', function() {
     initUI();
     initFFTUI();
-    // Compute and set default MHolesPos value
     updateDerived();
-    var r_R4_out = params.Rh + params.Rth + params.slits_w2 + params.Rth + params.slits_w4;
-    var defaultMHPos = (r_R4_out + params.TDiam / 2) / 2;
-    document.getElementById('mountingHolePos').value = defaultMHPos.toFixed(1);
     onParamChange();
     computeFFTSection();
 });
