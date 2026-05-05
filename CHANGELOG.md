@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3] - 2026-05-05
+
+### Changed
+
+- **UI reorganization**: Split and mounting holes controls merged into single "Mask modifications" section
+- **Split mask**: Replaced checkbox with 3-option selector (No / 1/3 / 1/6)
+  - 1/3 mode: clips mask from -60° to +60° (same as previous behavior)
+  - 1/6 mode: clips mask from 0° to 60° (new)
+- **3x mounting holes**: Renamed checkbox, added round/square shape option, radial position field,
+  diameter/side field (default 5mm, was radius 2.5mm)
+- **4x mounting holes**: New option creating holes at 0°/90°/180°/270° with 0°/60° rotation,
+  round/square shape, configurable position and diameter
+- **FFT controls**: Moved Compute FFT and Download FI PNG buttons above Mask source selector
+  in the FFT panel
+
+### Removed
+
+- 3D thickness field and 3D export buttons (bridge merge + scanline) from the UI
+- "Mounting holes" section title (controls now under "Mask modifications")
+
 ## [1.2.2] - 2026-05-04
 
 ### Changed
