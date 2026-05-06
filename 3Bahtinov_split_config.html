@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tri Bahtinov Mask, splittable, configurable — v1.4</title>
+<title>Tri Bahtinov Mask, splittable, configurable — v1.41</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -232,7 +232,7 @@ body {
 
 <!-- RIGHT: Controls -->
 <div id="controls-panel">
-    <h2>Tri Bahtinov Mask, splittable, configurable — v1.4</h2>
+    <h2>Tri Bahtinov Mask, splittable, configurable — v1.41</h2>
     <p class="desc">Tri-Bahtinov mask generator, based on Satakagi implementation. The mask can be split, to allow bigger masks to be 3D printed. Slits can be rotated of an offset angle. Programmed by Leonardo Della Pietra leodp@yahoo.com</p>
 
     <div class="section-title">Telescope parameters &amp; units</div>
@@ -435,6 +435,8 @@ body {
         </div>
 
         <div class="fft-field"><label for="fftWavelengthMode">Wavelength preset</label><select id="fftWavelengthMode"><option value="red">Red</option><option value="blue">Blue</option><option value="green" selected>Green</option><option value="rgb">RGB</option></select></div>
+        <div class="fft-field"><label for="fftDefocusMode">Defocus</label><select id="fftDefocusMode"><option value="none" selected>0 (in focus)</option><option value="front">Front focus</option><option value="back">Back focus</option></select></div>
+        <div class="fft-field"><label for="fftDefocusWaves">Defocus amount [waves @ 530 nm]</label><input id="fftDefocusWaves" type="number" step="0.05" min="0" value="0"></div>
         <div class="fft-field"><label for="fftGridSize">FFT grid size (pow2)</label><select id="fftGridSize"><option>512</option><option>1024</option><option selected>2048</option><option>4096</option></select></div>
         <div class="fft-field"><label for="fftPadFactor">Aperture margin factor</label><input id="fftPadFactor" type="number" step="0.01" value="1"></div>
         <div class="fft-field"><label for="fftMaskResMul">Mask resolution boost</label><select id="fftMaskResMul"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select></div>
@@ -444,7 +446,7 @@ body {
         <div class="fft-field"><label for="fftViewHalf">FFT half-view size</label><input id="fftViewHalf" type="number" step="0.001" value="3"></div>
 
         <div id="fft-status"></div>
-        <div class="fft-note">FFT half-view size is the half-width shown from the FI center in the selected units.</div>
+        <div class="fft-note">FFT half-view size is the half-width shown from the FI center in the selected units. Defocus uses waves referenced to 530 nm (green); in RGB mode each channel scales physically from this green reference.</div>
 
         <div class="fft-guidance">
             <strong>Practical parameter guide:</strong><br>
@@ -2923,6 +2925,8 @@ var fftState = {
     uploadedSvgText: null,
     uploadedSvgName: '',
     wavelengthMode: 'green',
+    defocusMode: 'none',
+    defocusWaves: 0,
     gridSize: 2048,
     padFactor: 1,
     maskResMul: 2,
@@ -2946,12 +2950,61 @@ function fftSetStatus(msg) {
 function fftReadUI() {
     fftState.sourceMode = document.getElementById('fftSourceMode').value;
     fftState.wavelengthMode = document.getElementById('fftWavelengthMode').value;
+    fftState.defocusMode = document.getElementById('fftDefocusMode').value;
+    fftState.defocusWaves = Math.max(0, parseFloat(document.getElementById('fftDefocusWaves').value) || 0);
     fftState.gridSize = parseInt(document.getElementById('fftGridSize').value, 10);
     fftState.padFactor = Math.max(1, parseFloat(document.getElementById('fftPadFactor').value));
     fftState.maskResMul = Math.max(1, parseInt(document.getElementById('fftMaskResMul').value, 10));
     fftState.toneMode = document.getElementById('fftToneMode').value;
     fftState.gain = Math.max(0, parseFloat(document.getElementById('fftGain').value) || 1);
     fftState.viewHalf = Math.max(0.001, parseFloat(document.getElementById('fftViewHalf').value));
+}
+
+function fftDefocusWavesForChannelNm(nm) {
+    if (fftState.defocusMode === 'none' || fftState.defocusWaves <= 0) return 0;
+    var sign = (fftState.defocusMode === 'front') ? -1 : 1;
+    var greenNm = 530;
+    // User enters waves referenced at green; convert to physical-opd-equivalent waves for each channel.
+    return sign * fftState.defocusWaves * (greenNm / nm);
+}
+
+function fftBuildComplexPupil(aperture, re, im, N, L, defocusWaves) {
+    var mag = Math.abs(defocusWaves);
+    if (mag < 1e-12) {
+        for (var i = 0; i < aperture.length; i++) {
+            re[i] = aperture[i];
+            im[i] = 0;
+        }
+        return;
+    }
+
+    var dx = L / N;
+    var half = N / 2;
+    var mirrorR = params.Diam / 2;
+    var invR2 = 1 / (mirrorR * mirrorR);
+
+    for (var iy = 0; iy < N; iy++) {
+        var y = (iy - half + 0.5) * dx;
+        for (var ix = 0; ix < N; ix++) {
+            var x = (ix - half + 0.5) * dx;
+            var idx = iy * N + ix;
+            var a = aperture[idx];
+            if (a <= 0) {
+                re[idx] = 0;
+                im[idx] = 0;
+                continue;
+            }
+            var rho2 = (x * x + y * y) * invR2;
+            if (rho2 > 1) {
+                re[idx] = 0;
+                im[idx] = 0;
+                continue;
+            }
+            var phase = 2 * Math.PI * defocusWaves * rho2;
+            re[idx] = a * Math.cos(phase);
+            im[idx] = a * Math.sin(phase);
+        }
+    }
 }
 
 function fftGetWavelengthSet() {
@@ -3330,7 +3383,12 @@ function fftDrawFocal(channelData, N) {
     var peakIntensity = channelData.length > 0 ? channelData[0].max / Math.max(1, fftState.normRef) : 0;
     ctx.fillText('Display gain: ' + fftState.gain + ' | Peak intensity: ' + peakIntensity.toExponential(3), 20, 44);
     var modeText = (waveSet.length === 1) ? ('Wavelength: ' + waveSet[0].nm + ' nm') : 'Wavelength: RGB (650/530/460 nm)';
-    ctx.fillText(modeText + ' | Tone: ' + fftState.toneMode, 20, 64);
+    var defocusText = 'Defocus: 0 (in focus)';
+    if (fftState.defocusMode !== 'none' && fftState.defocusWaves > 0) {
+        var dir = (fftState.defocusMode === 'front') ? 'front' : 'back';
+        defocusText = 'Defocus: ' + dir + ' ' + fftState.defocusWaves + ' waves @530nm';
+    }
+    ctx.fillText(modeText + ' | Tone: ' + fftState.toneMode + ' | ' + defocusText, 20, 64);
 }
 
 async function computeFFTSection() {
@@ -3369,8 +3427,10 @@ async function computeFFTSection() {
         var channels = [];
         for (var wi = 0; wi < waveSet.length; wi++) {
             var wv = waveSet[wi];
-            var re = new Float64Array(aperture);
+            var re = new Float64Array(N * N);
             var im = new Float64Array(N * N);
+            var defocusWv = fftDefocusWavesForChannelNm(wv.nm);
+            fftBuildComplexPupil(aperture, re, im, N, L, defocusWv);
             fft2d(re, im, N);
             var shifted = fftShiftIntensity(re, im, N);
             var focalPitchMm = (wv.nm * 1e-6) * params.FL / L;
@@ -3379,7 +3439,8 @@ async function computeFFTSection() {
                 nm: wv.nm,
                 intensity: shifted.intensity,
                 max: shifted.max,
-                focalPitchMm: focalPitchMm
+                focalPitchMm: focalPitchMm,
+                defocusWaves: defocusWv
             });
         }
 
@@ -3395,7 +3456,11 @@ async function computeFFTSection() {
         var fpMsg;
         if (channels.length === 1) fpMsg = channels[0].focalPitchMm.toExponential(3);
         else fpMsg = 'R ' + channels[0].focalPitchMm.toExponential(3) + ', G ' + channels[1].focalPitchMm.toExponential(3) + ', B ' + channels[2].focalPitchMm.toExponential(3);
-        fftSetStatus('Done. Aperture pitch = ' + (L / N).toFixed(4) + ' mm/pixel; focal pitch = ' + fpMsg + ' mm/pixel.');
+        var focusMsg = 'in focus';
+        if (fftState.defocusMode !== 'none' && fftState.defocusWaves > 0) {
+            focusMsg = ((fftState.defocusMode === 'front') ? 'front' : 'back') + ' ' + fftState.defocusWaves + ' waves @530nm';
+        }
+        fftSetStatus('Done. Aperture pitch = ' + (L / N).toFixed(4) + ' mm/pixel; focal pitch = ' + fpMsg + ' mm/pixel; ' + focusMsg + '.');
     } catch (e) {
         fftSetStatus('Error: ' + e.message);
     }

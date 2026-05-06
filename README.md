@@ -18,7 +18,7 @@ The project is intentionally framework-free: each tool is a single HTML file wit
 
 - `3Bahtinov_split_config.html`
 
-Release status: `v1.4`
+Release status: `v1.41`
 
 ### What it does
 
@@ -29,6 +29,9 @@ Release status: `v1.4`
 - Uses the generated SVG, or an uploaded SVG, as the source for FFT evaluation
 - Renders an approximate focal-plane image for quick parameter inspection
 - Supports red, green, blue, and RGB FFT rendering modes
+- Supports FFT defocus simulation with front/back focus selection and defocus amount
+  in waves referenced to 530 nm (green). In RGB mode, channel phase is physically
+  scaled from the green-reference defocus.
 - Exports STL using two approaches (via JavaScript, kept for compatibility):
   - Bridge-merge triangulation
   - Scanline exact triangulation (recommended for smooth boundaries)

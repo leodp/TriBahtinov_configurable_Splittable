@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.41] - 2026-05-06
+
+### Added
+
+- **FFT defocus simulation controls** in the rendering panel:
+  - `Defocus` menu with default `0 (in focus)` and explicit `Front focus` / `Back focus`
+  - `Defocus amount [waves @ 530 nm]` numeric control
+- **Defocused complex pupil model** for FFT computation:
+  - Applies quadratic phase term across aperture before 2D FFT
+  - Uses user-entered waves referenced at green (530 nm)
+  - In RGB mode, converts to per-channel equivalent waves using physical wavelength scaling
+
+### Changed
+
+- UI title and main heading version updated to `v1.41`
+- FFT status and FI overlay text now report active defocus state
+
 ## [1.4] - 2026-05-06
 
 ### Added
