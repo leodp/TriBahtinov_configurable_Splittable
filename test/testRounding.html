@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rounding Test – R2 slits with A_off=90°</title>
+<style>
+body { font-family: sans-serif; background:#1e1e1e; color:#ccc; margin:0; padding:10px; }
+h1 { font-size:1.1em; margin:4px 0; color:#fff; }
+h2 { font-size:0.85em; margin:4px 0 2px; color:#adf; }
+.panels { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.panel { background:#2a2a2a; border:1px solid #444; border-radius:4px; padding:6px; }
+.panel svg { display:block; }
+#params { font-size:0.78em; background:#333; padding:6px 10px; border-radius:4px; margin-bottom:8px; line-height:1.6; }
+</style>
+</head>
+<body>
+<h1>Slit Cutting Behaviour – Sector 0, A_off=90° (tiltRad=π/2)</h1>
+<div id="params"></div>
+<div class="panels" id="panels"></div>
+
+<script>
+// ============================================================
+// GEOMETRY HELPERS — exact copies from 3Bahtinov_split_config.html
+// ============================================================
+function polyArea(poly) {
+    var area = 0;
+    for (var i = 0; i < poly.length; i++) {
+        var j = (i + 1) % poly.length;
+        area += poly[i][0] * poly[j][1] - poly[j][0] * poly[i][1];
+    }
+    return area / 2;
+}
+
+function pointInPolygon(pt, poly) {
+    var x = pt[0], y = pt[1], inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi))
+            inside = !inside;
+    }
+    return inside;
+}
+
+function isInsideEdge(point, edgeStart, edgeEnd) {
+    return (edgeEnd[0] - edgeStart[0]) * (point[1] - edgeStart[1]) -
+           (edgeEnd[1] - edgeStart[1]) * (point[0] - edgeStart[0]) >= 0;
+}
+
+function lineIntersect(p1, p2, p3, p4) {
+    var x1 = p1[0], y1 = p1[1], x2 = p2[0], y2 = p2[1];
+    var x3 = p3[0], y3 = p3[1], x4 = p4[0], y4 = p4[1];
+    var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 1e-12) return null;
+    var t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
+}
+
+function sutherlandHodgman(subject, clip) {
+    if (!subject || subject.length < 3 || !clip || clip.length < 3) return [];
+    var output = subject.slice();
+    for (var i = 0; i < clip.length; i++) {
+        if (output.length === 0) return [];
+        var input = output; output = [];
+        var eS = clip[i], eE = clip[(i + 1) % clip.length];
+        for (var j = 0; j < input.length; j++) {
+            var cur = input[j], prev = input[(j + input.length - 1) % input.length];
+            var cI = isInsideEdge(cur, eS, eE), pI = isInsideEdge(prev, eS, eE);
+            if (cI) { if (!pI) { var x = lineIntersect(prev, cur, eS, eE); if (x) output.push(x); } output.push(cur); }
+            else if (pI) { var x = lineIntersect(prev, cur, eS, eE); if (x) output.push(x); }
+        }
+    }
+    return output;
+}
+
+function deg2rad(d) { return d * Math.PI / 180; }
+
+function buildReducedSector(sector_start, sector_end, rInner, rOuter, stemW, arcRes) {
+    arcRes = arcRes || 60;
+    var dAiL = Math.asin(Math.min(stemW / rInner, 1));
+    var dAoL = Math.asin(Math.min(stemW / rOuter, 1));
+    var dAiR = dAiL, dAoR = dAoL;
+    var aSI = sector_start + dAiL, aSO = sector_start + dAoL;
+    var aEI = sector_end - dAiR, aEO = sector_end - dAoR;
+    var poly = [];
+    poly.push([rInner * Math.cos(aSI), rInner * Math.sin(aSI)]);
+    var oStep = (aEO - aSO) / arcRes;
+    for (var i = 0; i <= arcRes; i++) { var a = aSO + i * oStep; poly.push([rOuter * Math.cos(a), rOuter * Math.sin(a)]); }
+    poly.push([rInner * Math.cos(aEI), rInner * Math.sin(aEI)]);
+    var iStep = (aEI - aSI) / arcRes;
+    for (var i = arcRes; i >= 0; i--) { var a = aSI + i * iStep; poly.push([rInner * Math.cos(a), rInner * Math.sin(a)]); }
+    return poly;
+}
+
+function buildSlitRect(tiltRad, offset, slitWidth, length) {
+    var ax = Math.cos(tiltRad), ay = Math.sin(tiltRad);
+    var px = -ay, py = ax;
+    var cx = offset * px, cy = offset * py;
+    var hl = length / 2, hw = slitWidth / 2;
+    return [
+        [cx - hl * ax - hw * px, cy - hl * ay - hw * py],
+        [cx + hl * ax - hw * px, cy + hl * ay - hw * py],
+        [cx + hl * ax + hw * px, cy + hl * ay + hw * py],
+        [cx - hl * ax + hw * px, cy - hl * ay + hw * py]
+    ];
+}
+
+function removeNearDuplicates(poly, eps) {
+    eps = eps || 1e-6; var out = [];
+    for (var i = 0; i < poly.length; i++) {
+        var p = poly[i], q = poly[(i + 1) % poly.length];
+        if (Math.sqrt((q[0]-p[0])*(q[0]-p[0])+(q[1]-p[1])*(q[1]-p[1])) > eps) out.push(p);
+    }
+    return out;
+}
+
+// ============================================================
+// applyRounding — bisector approach (from main file)
+// ============================================================
+function applyRounding(poly, roundR, arcSegs) {
+    if (roundR <= 0 || !poly || poly.length < 3) return poly;
+    arcSegs = arcSegs || 16;
+    var n = poly.length, COL = 5 * Math.PI / 180;
+    var winding = (polyArea(poly) >= 0) ? 1 : -1;
+
+    function turnAngle(i) {
+        var pr = poly[(i+n-1)%n], cu = poly[i], nx = poly[(i+1)%n];
+        var d1x=pr[0]-cu[0],d1y=pr[1]-cu[1],d2x=nx[0]-cu[0],d2y=nx[1]-cu[1];
+        var l1=Math.sqrt(d1x*d1x+d1y*d1y),l2=Math.sqrt(d2x*d2x+d2y*d2y);
+        if(l1<1e-9||l2<1e-9) return 0;
+        return Math.PI-Math.acos(Math.max(-1,Math.min(1,(d1x*d2x+d1y*d2y)/(l1*l2))));
+    }
+    function isConvex(i) {
+        var pr=poly[(i+n-1)%n],cu=poly[i],nx=poly[(i+1)%n];
+        return (winding*((cu[0]-pr[0])*(nx[1]-cu[1])-(cu[1]-pr[1])*(nx[0]-cu[0])))>1e-9;
+    }
+    var isSig = []; for(var i=0;i<n;i++) isSig.push(Math.abs(turnAngle(i))>COL && isConvex(i));
+    function eLen(i){var j=(i+1)%n;var dx=poly[j][0]-poly[i][0],dy=poly[j][1]-poly[i][1];return Math.sqrt(dx*dx+dy*dy);}
+    function accLen(i,fwd){var tot=0,idx=i;for(var s=0;s<n;s++){var nx2=fwd?(idx+1)%n:(idx+n-1)%n;tot+=fwd?eLen(idx):eLen(nx2);if(isSig[nx2]&&nx2!==i)break;idx=nx2;}return tot;}
+    var tDists=new Array(n);
+    for(var i=0;i<n;i++){tDists[i]=0;if(!isSig[i])continue;var pr=poly[(i+n-1)%n],cu=poly[i],nx=poly[(i+1)%n];var d1x=pr[0]-cu[0],d1y=pr[1]-cu[1],d2x=nx[0]-cu[0],d2y=nx[1]-cu[1];var l1=Math.sqrt(d1x*d1x+d1y*d1y),l2=Math.sqrt(d2x*d2x+d2y*d2y);if(l1<1e-9||l2<1e-9)continue;var u1x=d1x/l1,u1y=d1y/l1,u2x=d2x/l2,u2y=d2y/l2;var dot=Math.max(-1,Math.min(1,u1x*u2x+u1y*u2y));var hA=Math.acos(dot)/2;if(Math.abs(Math.sin(hA))<1e-9)continue;var td=roundR/Math.tan(hA);var mx=Math.min(accLen(i,false)*0.80,accLen(i,true)*0.80);if(td>mx)td=mx;tDists[i]=td;}
+    var consumed=new Array(n).fill(false);
+    for(var i=0;i<n;i++){if(!isSig[i]||tDists[i]<=0)continue;var td=tDists[i];var dist=0,idx=i;for(var s=0;s<n;s++){var p2=(idx+n-1)%n;dist+=eLen(p2);if(isSig[p2]&&p2!==i)break;if(dist<=td)consumed[p2]=true;else break;idx=p2;}dist=0;idx=i;for(var s=0;s<n;s++){var p2=(idx+1)%n;dist+=eLen(idx);if(isSig[p2]&&p2!==i)break;if(dist<=td)consumed[p2]=true;else break;idx=p2;}}
+    var result=[];
+    for(var i=0;i<n;i++){
+        if(consumed[i])continue;
+        if(!isSig[i]){result.push(poly[i]);continue;}
+        var pr=poly[(i+n-1)%n],cu=poly[i],nx=poly[(i+1)%n];
+        var d1x=pr[0]-cu[0],d1y=pr[1]-cu[1],d2x=nx[0]-cu[0],d2y=nx[1]-cu[1];
+        var l1=Math.sqrt(d1x*d1x+d1y*d1y),l2=Math.sqrt(d2x*d2x+d2y*d2y);
+        if(l1<1e-9||l2<1e-9){result.push(cu);continue;}
+        var u1x=d1x/l1,u1y=d1y/l1,u2x=d2x/l2,u2y=d2y/l2;
+        var dot=Math.max(-1,Math.min(1,u1x*u2x+u1y*u2y));
+        var hA=Math.acos(dot)/2;
+        if(Math.abs(Math.sin(hA))<1e-9){result.push(cu);continue;}
+        var td=tDists[i];if(td<=0){result.push(cu);continue;}
+        var eR=td*Math.tan(hA);
+        var t1x=cu[0]+u1x*td,t1y=cu[1]+u1y*td;
+        var t2x=cu[0]+u2x*td,t2y=cu[1]+u2y*td;
+        var bisX=u1x+u2x,bisY=u1y+u2y,bL=Math.sqrt(bisX*bisX+bisY*bisY);
+        if(bL<1e-9){result.push(cu);continue;}
+        bisX/=bL;bisY/=bL;
+        var cD=eR/Math.sin(hA);
+        var cAx=cu[0]+bisX*cD,cAy=cu[1]+bisY*cD;
+        var cBx=cu[0]-bisX*cD,cBy=cu[1]-bisY*cD;
+        function mkArc(ccx,ccy){var a0=Math.atan2(t1y-ccy,t1x-ccx),a1=Math.atan2(t2y-ccy,t2x-ccx);var sw=a1-a0;while(sw>Math.PI)sw-=2*Math.PI;while(sw<-Math.PI)sw+=2*Math.PI;var mid=a0+0.5*sw;return{cx:ccx,cy:ccy,r:eR,start:a0,sweep:sw,mid:[ccx+eR*Math.cos(mid),ccy+eR*Math.sin(mid)]};}
+        var iA=pointInPolygon([cAx,cAy],poly),arcA=mkArc(cAx,cAy),aAi=pointInPolygon(arcA.mid,poly);
+        var iB=pointInPolygon([cBx,cBy],poly),arcB=mkArc(cBx,cBy),aBi=pointInPolygon(arcB.mid,poly);
+        var chosen=null;
+        if(iA&&aAi&&!(iB&&aBi))chosen=arcA;else if(iB&&aBi&&!(iA&&aAi))chosen=arcB;
+        else if(iA&&aAi)chosen=arcA;else if(iB&&aBi)chosen=arcB;
+        if(!chosen){result.push(cu);continue;}
+        for(var s=0;s<=arcSegs;s++){var t=s/arcSegs;var a=chosen.start+chosen.sweep*t;result.push([chosen.cx+eR*Math.cos(a),chosen.cy+eR*Math.sin(a)]);}
+    }
+    return result;
+}
+
+// ============================================================
+// PARAMETERS
+// ============================================================
+var FL=1500, BahF=100, OF=3, Diam=203, Rh=15, Rth=5, SectorsStem_th=6, Sd_Sst_rat=1.5, SlitsRatio=1;
+var A_off = 90; // <--- OFFSET ANGLE
+var slits_step = OF * FL / BahF;                          // 45 mm
+var slits_w = (Diam/2 - Rth - Rth - Rh) / 2;             // 38.25 mm
+var slits_w2 = 2 * slits_w / (1 + 1/SlitsRatio);         // 38.25 mm
+var slits_d = slits_step / (1 + Sd_Sst_rat);              // 18 mm
+var rInner = Rh + Rth;                                    // 20 mm
+var rOuter = rInner + slits_w2;                           // 58.25 mm
+var stemW = SectorsStem_th / 2;                           // 3 mm
+var Rounding = 0.99;
+var roundR = Rounding * slits_d / 2;                      // 8.91 mm
+
+// ============================================================
+// GENERATE ALL R2 SLITS FOR SECTOR 0 — same pipeline as drawMask
+// Sector 0: sectorBase=0, sectorStart=-60°, sectorEnd=+60°
+// tilt = sectorBase + A_off = 0 + 90 = 90°
+// ============================================================
+var sector_start = deg2rad(-60), sector_end = deg2rad(60);
+var tiltRad = deg2rad(0 + A_off);  // = π/2
+var reducedSector = buildReducedSector(sector_start, sector_end, rInner, rOuter, stemW, 120);
+
+var slitLength = 2 * rOuter + 10;
+var k_max = Math.ceil(rOuter / slits_step);
+
+var allSlits = [];  // {k, offset, raw, rounded}
+for (var k = -k_max; k <= k_max; k++) {
+    var offset = k * slits_step;
+    var slitRect = buildSlitRect(tiltRad, offset, slits_d, slitLength);
+    var clipped = sutherlandHodgman(reducedSector, slitRect);
+    if (clipped && clipped.length >= 3) {
+        var raw = removeNearDuplicates(clipped, 0.01);
+        if (raw.length < 3) continue;
+        var rounded = applyRounding(raw.slice(), roundR, 16);
+        allSlits.push({k: k, offset: offset, raw: raw, rounded: rounded});
+    }
+}
+
+// ============================================================
+// DISPLAY SETUP
+// ============================================================
+var MARGIN = 12;
+var COLORS = ['#4af','#f4a','#4f8','#fc4','#a4f','#4ff','#fa4','#f48'];
+
+function polyBounds(polys) {
+    var xn=Infinity,xx=-Infinity,yn=Infinity,yx=-Infinity;
+    polys.forEach(function(p){p.forEach(function(v){
+        if(v[0]<xn)xn=v[0];if(v[0]>xx)xx=v[0];
+        if(v[1]<yn)yn=v[1];if(v[1]>yx)yx=v[1];
+    });});
+    var pad=3;return{xmin:xn-pad,xmax:xx+pad,ymin:yn-pad,ymax:yx+pad};
+}
+
+// Global view: full sector
+var sectorBounds = polyBounds([reducedSector]);
+
+function makeTransform(bounds, W, H) {
+    var xr=bounds.xmax-bounds.xmin, yr=bounds.ymax-bounds.ymin;
+    var scale = Math.min((W-2*MARGIN)/xr, (H-2*MARGIN)/yr);
+    return function(x,y){
+        return [MARGIN+(x-bounds.xmin)*scale, MARGIN+(bounds.ymax-y)*scale];
+    };
+}
+
+function polyPath(poly, toSvg) {
+    if (!poly || poly.length < 2) return '';
+    var d = '';
+    for (var i = 0; i < poly.length; i++) {
+        var s = toSvg(poly[i][0], poly[i][1]);
+        d += (i === 0 ? 'M' : 'L') + s[0].toFixed(2) + ',' + s[1].toFixed(2);
+    }
+    return d + 'Z';
+}
+
+function circlePath(cx, cy, r, toSvg) {
+    var pts = 60, d = '';
+    for (var k = 0; k <= pts; k++) {
+        var a = k/pts*2*Math.PI, s = toSvg(cx+r*Math.cos(a), cy+r*Math.sin(a));
+        d += (k===0?'M':'L') + s[0].toFixed(1) + ',' + s[1].toFixed(1);
+    }
+    return d + 'Z';
+}
+
+function addP(svg, d, fill, stroke, sw, dash) {
+    var p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',d); p.setAttribute('fill',fill||'none'); p.setAttribute('stroke',stroke||'none'); p.setAttribute('stroke-width',sw||1);
+    if (dash) p.setAttribute('stroke-dasharray',dash);
+    svg.appendChild(p);
+}
+function addDot(svg, x, y, r, color) {
+    var c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',r); c.setAttribute('fill',color);
+    svg.appendChild(c);
+}
+function addText(svg, x, y, text, color, size) {
+    var t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x); t.setAttribute('y',y); t.setAttribute('fill',color||'#888'); t.setAttribute('font-size',size||'9');
+    t.textContent = text; svg.appendChild(t);
+}
+
+function makePanel(title, W, H, drawFn) {
+    var div = document.createElement('div'); div.className = 'panel';
+    var h = document.createElement('h2'); h.textContent = title; div.appendChild(h);
+    var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('width',W); svg.setAttribute('height',H);
+    var bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    bg.setAttribute('width',W); bg.setAttribute('height',H); bg.setAttribute('fill','#1a1a1a');
+    svg.appendChild(bg);
+    drawFn(svg);
+    div.appendChild(svg);
+    return div;
+}
+
+var container = document.getElementById('panels');
+
+// =====================================================
+// PANEL 0: Overview — full sector with all slit rectangles & clipped shapes
+// =====================================================
+(function(){
+    var W0 = 520, H0 = 520;
+    var toSvg = makeTransform(sectorBounds, W0, H0);
+    container.appendChild(makePanel(
+        '0 · Overview: sector 0 (±60°) + ' + allSlits.length + ' clipped slits  [A_off=' + A_off + '°, tilt=' + (0+A_off) + '°]',
+        W0, H0, function(svg) {
+            // Ring guides
+            addP(svg, circlePath(0,0,rInner,toSvg), 'none','#444',0.7,'4,4');
+            addP(svg, circlePath(0,0,rOuter,toSvg), 'none','#444',0.7,'4,4');
+            // Reduced sector outline
+            addP(svg, polyPath(reducedSector,toSvg), 'rgba(255,255,255,0.05)', '#666', 1);
+            // Slit rectangles (full, before clipping) + clipped shapes
+            allSlits.forEach(function(sl, idx) {
+                var slitRect = buildSlitRect(tiltRad, sl.offset, slits_d, slitLength);
+                var col = COLORS[idx % COLORS.length];
+                addP(svg, polyPath(slitRect,toSvg), 'none', col, 0.4, '6,4');
+                addP(svg, polyPath(sl.raw,toSvg), col.replace(')',',0.2)').replace('rgb','rgba').replace('#',''), col, 1.2);
+                // Label
+                var cx2=0,cy2=0;sl.raw.forEach(function(v){cx2+=v[0];cy2+=v[1];});
+                cx2/=sl.raw.length;cy2/=sl.raw.length;
+                var s=toSvg(cx2,cy2);
+                addText(svg,s[0]-8,s[1]+3,'k='+sl.k,col,10);
+            });
+            // Origin cross
+            var oc=toSvg(0,0);
+            addDot(svg,oc[0],oc[1],3,'#888');
+            addText(svg,8,16,'Dashed rects=slit bands  Solid=clipped shapes  tiltRad=π/2','#888',9);
+        }));
+})();
+
+// =====================================================
+// PANELS 1..N: Each individual slit — raw vs rounded
+// =====================================================
+allSlits.forEach(function(sl, idx) {
+    var col = COLORS[idx % COLORS.length];
+    var bounds = polyBounds([sl.raw]);
+    // Widen bounds slightly to show rounding circles
+    bounds.xmin -= roundR; bounds.xmax += roundR;
+    bounds.ymin -= roundR; bounds.ymax += roundR;
+    var aspect = (bounds.xmax - bounds.xmin) / (bounds.ymax - bounds.ymin);
+    var Wp = Math.max(300, Math.min(500, Math.round(350 * aspect)));
+    var Hp = Math.round(Wp / aspect);
+    if (Hp > 500) { Hp = 500; Wp = Math.round(Hp * aspect); }
+    if (Hp < 200) { Hp = 200; Wp = Math.round(Hp * aspect); }
+    var toSvg = makeTransform(bounds, Wp, Hp);
+
+    container.appendChild(makePanel(
+        (idx+1) + ' · Slit k=' + sl.k + ' (offset=' + sl.offset + 'mm) — ' + sl.raw.length + ' verts, area=' + Math.abs(polyArea(sl.raw)).toFixed(1) + 'mm²',
+        Wp, Hp, function(svg) {
+            // Ring guides
+            addP(svg, circlePath(0,0,rInner,toSvg), 'none','#444',0.5,'3,3');
+            addP(svg, circlePath(0,0,rOuter,toSvg), 'none','#444',0.5,'3,3');
+            // Raw slit
+            addP(svg, polyPath(sl.raw,toSvg), 'rgba(60,180,255,0.15)', '#4af', 0.8, '4,3');
+            // Rounded slit
+            addP(svg, polyPath(sl.rounded,toSvg), 'rgba(60,255,120,0.2)', '#4f8', 1.2);
+            // Annotate convex/concave corners on raw slit
+            var n = sl.raw.length, w = (polyArea(sl.raw) >= 0) ? 1 : -1;
+            for (var i = 0; i < n; i++) {
+                var pr=sl.raw[(i+n-1)%n],cu=sl.raw[i],nx=sl.raw[(i+1)%n];
+                var d1x=pr[0]-cu[0],d1y=pr[1]-cu[1],d2x=nx[0]-cu[0],d2y=nx[1]-cu[1];
+                var l1=Math.sqrt(d1x*d1x+d1y*d1y),l2=Math.sqrt(d2x*d2x+d2y*d2y);
+                if(l1<1e-9||l2<1e-9)continue;
+                var ta=Math.PI-Math.acos(Math.max(-1,Math.min(1,(d1x*d2x+d1y*d2y)/(l1*l2))));
+                if(Math.abs(ta)<5*Math.PI/180)continue;
+                var cross2=(cu[0]-pr[0])*(nx[1]-cu[1])-(cu[1]-pr[1])*(nx[0]-cu[0]);
+                var convex=(w*cross2)>1e-9;
+                var sv=toSvg(cu[0],cu[1]);
+                addDot(svg,sv[0],sv[1],3,convex?'#0f0':'#f44');
+                addText(svg,sv[0]+4,sv[1]-2,'v'+i+(convex?' cvx':' ccv'),'#777',7);
+            }
+            addText(svg,8,14,'blue dashed=raw  green=rounded  ●green=convex  ●red=concave','#777',8);
+        }));
+
+    // Zoom panel for this slit — zoom into each convex corner
+    var n = sl.raw.length, w = (polyArea(sl.raw) >= 0) ? 1 : -1;
+    var convCorners = [];
+    for (var i = 0; i < n; i++) {
+        var pr=sl.raw[(i+n-1)%n],cu=sl.raw[i],nx=sl.raw[(i+1)%n];
+        var d1x=pr[0]-cu[0],d1y=pr[1]-cu[1],d2x=nx[0]-cu[0],d2y=nx[1]-cu[1];
+        var l1=Math.sqrt(d1x*d1x+d1y*d1y),l2=Math.sqrt(d2x*d2x+d2y*d2y);
+        if(l1<1e-9||l2<1e-9)continue;
+        var ta=Math.PI-Math.acos(Math.max(-1,Math.min(1,(d1x*d2x+d1y*d2y)/(l1*l2))));
+        if(Math.abs(ta)<5*Math.PI/180)continue;
+        var cross2=(cu[0]-pr[0])*(nx[1]-cu[1])-(cu[1]-pr[1])*(nx[0]-cu[0]);
+        if((w*cross2)>1e-9) convCorners.push({idx:i,x:cu[0],y:cu[1],ta:ta});
+    }
+    if (convCorners.length > 0 && convCorners.length <= 8) {
+        // One zoom row for all convex corners of this slit
+        var zW = 220, zH = 220;
+        var zR = roundR * 2.5;
+        convCorners.forEach(function(cc) {
+            var zBounds = {xmin:cc.x-zR, xmax:cc.x+zR, ymin:cc.y-zR, ymax:cc.y+zR};
+            var zToSvg = makeTransform(zBounds, zW, zH);
+            container.appendChild(makePanel(
+                'Zoom k=' + sl.k + ' v' + cc.idx + ' (turn=' + (cc.ta*180/Math.PI).toFixed(1) + '°)',
+                zW, zH, function(svg) {
+                    addP(svg, circlePath(0,0,rInner,zToSvg), 'none','#555',0.5,'3,3');
+                    addP(svg, circlePath(0,0,rOuter,zToSvg), 'none','#555',0.5,'3,3');
+                    addP(svg, polyPath(sl.raw,zToSvg), 'rgba(60,180,255,0.15)','#4af',0.8);
+                    addP(svg, polyPath(sl.rounded,zToSvg), 'rgba(60,255,120,0.15)','#4f8',1.2);
+                    var sv=zToSvg(cc.x,cc.y);
+                    addDot(svg,sv[0],sv[1],4,'#fff');
+                    // Radius of slit from origin to corner
+                    var rr=Math.sqrt(cc.x*cc.x+cc.y*cc.y);
+                    addText(svg,8,14,'r='+rr.toFixed(1)+' rI='+rInner+' rO='+rOuter.toFixed(1),'#777',8);
+                }));
+        });
+    }
+});
+
+// ---- Parameters info ----
+var info = document.getElementById('params');
+info.innerHTML =
+    '<b>A_off=' + A_off + '° → tilt = sectorBase(0°) + A_off = ' + (0+A_off) + '° → tiltRad = π/2</b><br>' +
+    'FL=' + FL + ' · BahF=' + BahF + ' · OF=' + OF + ' → slits_step=' + slits_step + ' mm<br>' +
+    'Diam=' + Diam + ' · Rh=' + Rh + ' · Rth=' + Rth + ' → rInner=' + rInner + ' · rOuter=' + rOuter + ' mm<br>' +
+    'Sd_Sst_rat=' + Sd_Sst_rat + ' → slits_d=' + slits_d + ' mm · stemW=' + stemW + ' mm<br>' +
+    'Rounding=' + Rounding + ' → roundR=' + roundR.toFixed(3) + ' mm<br>' +
+    'Slits found in sector: <b>' + allSlits.length + '</b> — k values: [' + allSlits.map(function(s){return s.k;}).join(', ') + ']<br>' +
+    'Sector 0: ±60°, tiltRad=π/2 (slits run along y-axis, offsets along x-axis)';
+</script>
+</body>
+</html>

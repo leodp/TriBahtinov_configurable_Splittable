@@ -2,6 +2,51 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4] - 2026-05-06
+
+### Added
+
+- **Split STL: watertight side-wall synthesis** — new multi-pass side-wall generation for split
+  masks that closes all boundary gaps without introducing extra structures:
+  - Topology-based boundary edges (holes, slits, inner ring)
+  - Direct outer-ring wall emission from split boundary polygon
+  - Targeted radial-wall gap patcher (only fills missing intervals, hole-cut-aware)
+- **Geometric ray-cast hole detection** for radial boundary cut intervals — replaces
+  edge-collinearity heuristic; correctly identifies where mounting holes and slits
+  intersect split radial boundaries regardless of polygon vertex alignment
+- **`edgeIsOnRadialBoundary` span guard** (`requireSpan` flag) — prevents transverse slit-head
+  edges at the split angle from being misclassified as radial walls; applied only in topology
+  filter and radial-coverage collection, not in slit-suppression logic
+- **Ring-only suppressed-edge filter** — hole/slit boundary suppression now restricted to edges
+  near inner/outer ring radius, preventing false suppression of slit body side walls
+- **`edgesAreCoincident` helper** for precise edge matching
+- **`emitOuterBoundaryWalls`** direct outer-polygon arc emitter with radial-edge skip
+- **`filterOutRadialBoundaryEdges`** utility for stripping radial edges from topology set
+- **`keepLargestTriangleComponent`** — removes detached shells from scanline triangulation output
+- **Test files in `test/`** added to repository:
+  - `export_visualizer.html` — STL/SVG visual inspection tool
+  - `test_3d_extrusion.html`, `test_3d_extrusion_v2.html` — extrusion strategy comparisons
+  - `test_OffsetAngle.html`, `test_parallelogram.html`, `test_slit_methods.html`
+  - `test_R4_stem60_rounding_methods.html`, `test_R4_stem60_rounding_optimizations_local.html`
+  - `testRounding.html`, `testRounding_arcfix.html`
+  - `EDGE_CASE_TEST_GUIDE.md` — documented edge-case test procedures
+
+### Fixed
+
+- Split STL: gap at outer ring corner where split sector meets arc boundary (1/3 and 1/6)
+- Split STL: extra slit structures in 1/6 split mode (slit side walls erroneously emitted
+  on split radial boundary)
+- Split STL: residual fragment structures at inner/outer ring in mounting hole area
+- Split STL: slit openings closed by wall fragments when slit offset = 90° (slit heads at
+  split angle misidentified as radial wall segments)
+- Split STL: mounting hole artifacts at outer ring near split sector edges
+
+### Changed
+
+- Project name corrected from `TroBahtinov_configurable_Splittable` to
+  `TriBahtinov_configurable_Splittable` in README and UI title
+- Title/heading now shows version: **"Tri Bahtinov Mask, splittable, configurable — v1.4"**
+
 ## [1.3] - 2026-05-05
 
 ### Changed

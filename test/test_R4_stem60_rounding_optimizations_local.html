@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>R4 Stem60 - Local Optimization Sandbox (Not for Release)</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 14px; background: #efefef; }
+h1 { margin: 0 0 8px; }
+.info { font-size: 13px; color: #333; margin: 0 0 10px; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); gap: 10px; }
+.cell { background: white; border: 1px solid #bbb; padding: 8px; }
+.cell h3 { margin: 0 0 6px; font-size: 12px; }
+.panel { border: 1px solid #ccc; width: 100%; height: 170px; }
+.legend { font-size: 11px; color: #555; margin-top: 4px; }
+.method { margin: 14px 0 8px; font-size: 15px; }
+pre { margin: 6px 0 0; font-size: 11px; background: #f8f8f8; padding: 6px; border: 1px solid #ddd; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Local Optimization Sandbox: R4 Slits Near 60deg Stem</h1>
+<p class="info">This file is intentionally local-only (not for push). Orange dashed = original. Cyan = rounded. Red markers = corners that were hard to round.</p>
+<p class="info">Ideas tested: O1 adaptive-convexity, O2 never-skip radius backoff, O3 local-edge model fit, O4 hybrid pick-best (max valid area).</p>
+<div id="root"></div>
+
+<script>
+function deg2rad(d){return d*Math.PI/180;}
+function rad2deg(r){return r*180/Math.PI;}
+function polyArea(poly){var a=0;for(var i=0;i<poly.length;i++){var j=(i+1)%poly.length;a+=poly[i][0]*poly[j][1]-poly[j][0]*poly[i][1];}return 0.5*a;}
+function pointInPolygon(pt, poly){var x=pt[0],y=pt[1],inside=false;for(var i=0,j=poly.length-1;i<poly.length;j=i++){var xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];var hit=((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)+1e-30)+xi);if(hit)inside=!inside;}return inside;}
+function polygonToPath(poly){if(!poly||poly.length<3)return'';var d='M'+poly[0][0]+','+(-poly[0][1]);for(var i=1;i<poly.length;i++)d+='L'+poly[i][0]+','+(-poly[i][1]);return d+'Z';}
+
+function isInsideEdge(point, edgeStart, edgeEnd){return (edgeEnd[0]-edgeStart[0])*(point[1]-edgeStart[1])-(edgeEnd[1]-edgeStart[1])*(point[0]-edgeStart[0])>=0;}
+function lineIntersect(p1,p2,p3,p4){var x1=p1[0],y1=p1[1],x2=p2[0],y2=p2[1],x3=p3[0],y3=p3[1],x4=p4[0],y4=p4[1];var denom=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);if(Math.abs(denom)<1e-12)return null;var t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/denom;return [x1+t*(x2-x1),y1+t*(y2-y1)];}
+function sutherlandHodgman(subject, clip){if(!subject||subject.length<3||!clip||clip.length<3)return[];var output=subject.slice();for(var i=0;i<clip.length;i++){if(output.length===0)return[];var input=output;output=[];var edgeStart=clip[i],edgeEnd=clip[(i+1)%clip.length];for(var j=0;j<input.length;j++){var current=input[j],previous=input[(j+input.length-1)%input.length];var currIn=isInsideEdge(current,edgeStart,edgeEnd);var prevIn=isInsideEdge(previous,edgeStart,edgeEnd);if(currIn){if(!prevIn){var inter1=lineIntersect(previous,current,edgeStart,edgeEnd);if(inter1)output.push(inter1);}output.push(current);}else if(prevIn){var inter2=lineIntersect(previous,current,edgeStart,edgeEnd);if(inter2)output.push(inter2);}}}return output;}
+function buildReducedSector(sectorStart, sectorEnd, rInner, rOuter, stemW, arcRes){arcRes=arcRes||60;var dIL=Math.asin(Math.min(stemW/rInner,1)),dOL=Math.asin(Math.min(stemW/rOuter,1));var dIR=dIL,dOR=dOL;var aSI=sectorStart+dIL,aSO=sectorStart+dOL,aEI=sectorEnd-dIR,aEO=sectorEnd-dOR;var poly=[];poly.push([rInner*Math.cos(aSI),rInner*Math.sin(aSI)]);var oStep=(aEO-aSO)/arcRes;for(var i=0;i<=arcRes;i++){var ao=aSO+i*oStep;poly.push([rOuter*Math.cos(ao),rOuter*Math.sin(ao)]);}poly.push([rInner*Math.cos(aEI),rInner*Math.sin(aEI)]);var iStep=(aEI-aSI)/arcRes;for(var k=arcRes;k>=0;k--){var ai=aSI+k*iStep;poly.push([rInner*Math.cos(ai),rInner*Math.sin(ai)]);}return poly;}
+function buildSlitRect(tiltRad, offset, slitWidth, length){var ax=Math.cos(tiltRad),ay=Math.sin(tiltRad),px=-ay,py=ax;var cx=offset*px,cy=offset*py,hl=length/2,hw=slitWidth/2;return[[cx-hl*ax-hw*px,cy-hl*ay-hw*py],[cx+hl*ax-hw*px,cy+hl*ay-hw*py],[cx+hl*ax+hw*px,cy+hl*ay+hw*py],[cx-hl*ax+hw*px,cy-hl*ay+hw*py]];}
+function generateSectorSlits(tiltDeg, sectorStartDeg, sectorEndDeg, rInner, rOuter, stemW, slitsStep, slitsD){var tiltRad=deg2rad(tiltDeg),sectorStart=deg2rad(sectorStartDeg),sectorEnd=deg2rad(sectorEndDeg);var reduced=buildReducedSector(sectorStart,sectorEnd,rInner,rOuter,stemW,60);var slitLength=2*rOuter+10,slits=[],kMax=Math.ceil(rOuter/slitsStep);for(var k=-kMax;k<=kMax;k++){var rect=buildSlitRect(tiltRad,k*slitsStep,slitsD,slitLength);var clipped=sutherlandHodgman(reduced,rect);if(clipped&&clipped.length>=3)slits.push(clipped);}return slits;}
+
+function closestOnSideEx(poly, cornerIdx, dir, center, maxWalk){var n=poly.length;var first=(cornerIdx+dir+n)%n;var best={dist:Infinity,point:null,segA:cornerIdx,segB:first,t:0};var walkD=0,cur=cornerIdx;for(var step=0;step<n&&walkD<maxWalk;step++){var next=(cur+dir+n)%n;var sA=poly[cur],sB=poly[next];var dx=sB[0]-sA[0],dy=sB[1]-sA[1],sLen=Math.sqrt(dx*dx+dy*dy);if(sLen>1e-12){var t=((center[0]-sA[0])*dx+(center[1]-sA[1])*dy)/(sLen*sLen);t=Math.max(0,Math.min(1,t));var foot=[sA[0]+t*dx,sA[1]+t*dy];var d=Math.sqrt((center[0]-foot[0])*(center[0]-foot[0])+(center[1]-foot[1])*(center[1]-foot[1]));if(d<best.dist){best.dist=d;best.point=foot;best.segA=cur;best.segB=next;best.t=t;}walkD+=sLen;}cur=next;}if(!best.point)best.point=poly[cornerIdx].slice();return best;}
+
+function getCornersAdaptive(poly, colDeg){
+  var n=poly.length,wind=(polyArea(poly)>=0)?1:-1,out=[];
+  var thr=Math.max(1,Math.min(8,colDeg||5))*Math.PI/180;
+  for(var i=0;i<n;i++){
+    var prev=poly[(i+n-1)%n],cur=poly[i],next=poly[(i+1)%n];
+    var d1x=prev[0]-cur[0],d1y=prev[1]-cur[1],d2x=next[0]-cur[0],d2y=next[1]-cur[1];
+    var l1=Math.sqrt(d1x*d1x+d1y*d1y),l2=Math.sqrt(d2x*d2x+d2y*d2y);
+    if(l1<1e-9||l2<1e-9)continue;
+    var dot=(d1x*d2x+d1y*d2y)/(l1*l2);dot=Math.max(-1,Math.min(1,dot));
+    var ta=Math.PI-Math.acos(dot);
+    var cross=(cur[0]-prev[0])*(next[1]-cur[1])-(cur[1]-prev[1])*(next[0]-cur[0]);
+    if(Math.abs(ta)>=thr&&(wind*cross)>1e-12)out.push({idx:i,halfA:0.5*Math.acos(dot)});
+  }
+  return out;
+}
+
+function buildWithFallback(poly, centers, arcSegs, opts){
+  var n=poly.length,skip=new Array(n),arcs={},failed=[];for(var i=0;i<n;i++)skip[i]=-1;
+  for(var fi=0;fi<centers.length;fi++){
+    var fc=centers[fi];if(!fc.ok)continue;var ci=fc.cornerIdx;var rr=fc.r;var mw=Math.max(rr*5,1);
+    var accepted=false;var cR=rr;
+    // O2: never-skip radius backoff (progressively reduce until valid)
+    for(var back=0;back<6&&!accepted;back++){
+      if(opts.centerInside && !pointInPolygon([fc.cx,fc.cy],poly)){ cR*=opts.backoff; continue; }
+      var backTP=closestOnSideEx(poly,ci,-1,[fc.cx,fc.cy],mw);
+      var fwdTP=closestOnSideEx(poly,ci,+1,[fc.cx,fc.cy],mw);
+      if(opts.tangentTol>0 && (Math.abs(backTP.dist-cR)>cR*opts.tangentTol || Math.abs(fwdTP.dist-cR)>cR*opts.tangentTol)){
+        cR*=opts.backoff; continue;
+      }
+      var a0=Math.atan2(backTP.point[1]-fc.cy,backTP.point[0]-fc.cx);
+      var a1=Math.atan2(fwdTP.point[1]-fc.cy,fwdTP.point[0]-fc.cx);
+      var sw=a1-a0;while(sw>Math.PI)sw-=2*Math.PI;while(sw<-Math.PI)sw+=2*Math.PI;
+      var aC=Math.atan2(fc.v[1]-fc.cy,fc.v[0]-fc.cx),dC=aC-a0;while(dC>Math.PI)dC-=2*Math.PI;while(dC<-Math.PI)dC+=2*Math.PI;
+      if((sw>0&&dC<0)||(sw<0&&dC>0))sw=(sw>0)?sw-2*Math.PI:sw+2*Math.PI;
+      var pts=[];for(var s=0;s<=arcSegs;s++){var a=a0+sw*s/arcSegs;pts.push([fc.cx+cR*Math.cos(a),fc.cy+cR*Math.sin(a)]);} 
+      skip[ci]=ci;
+      var cur=(ci-1+n)%n,safe=0;while(cur!==backTP.segB&&cur!==ci&&safe<n){skip[cur]=ci;cur=(cur-1+n)%n;safe++;}
+      cur=(ci+1)%n;safe=0;while(cur!==fwdTP.segB&&cur!==ci&&safe<n){skip[cur]=ci;cur=(cur+1)%n;safe++;}
+      arcs[ci]=pts;accepted=true;
+    }
+    if(!accepted)failed.push(ci);
+  }
+  var res=[];for(var j=0;j<n;j++){if(skip[j]>=0){if(skip[j]===j&&arcs[j])res.push.apply(res,arcs[j]);continue;}res.push(poly[j]);}
+  return {poly:res,failed:failed};
+}
+
+function roundedByMethod(poly, r, ctx, method){
+  var corners=getCornersAdaptive(poly, method.colDeg), centers=[];
+  var n=poly.length;
+  var tiltRad=deg2rad(ctx.tiltDeg),ax=Math.cos(tiltRad),ay=Math.sin(tiltRad),px=-ay,py=ax;
+  var cx=0,cy=0;for(var i=0;i<n;i++){cx+=poly[i][0];cy+=poly[i][1];}cx/=n;cy/=n;
+
+  for(var ci=0;ci<corners.length;ci++){
+    var cMeta=corners[ci],iCorner=cMeta.idx,cu=poly[iCorner],rUse=r;
+    var rVert=Math.sqrt(cu[0]*cu[0]+cu[1]*cu[1]);
+    var onOuter=ctx.rOuter>0&&Math.abs(rVert-ctx.rOuter)<1.5;
+    var onInner=ctx.rInner>0&&Math.abs(rVert-ctx.rInner)<1.5;
+
+    // O3: local edge-model fit near curved boundary: infer edge direction from neighbor segment
+    if(onOuter||onInner){
+      var prev=poly[(iCorner+n-1)%n],next=poly[(iCorner+1)%n];
+      var useSeg = (Math.abs(Math.sqrt(prev[0]*prev[0]+prev[1]*prev[1]) - rVert) > Math.abs(Math.sqrt(next[0]*next[0]+next[1]*next[1]) - rVert)) ? [prev, cu] : [cu, next];
+      var ex=useSeg[1][0]-useSeg[0][0],ey=useSeg[1][1]-useSeg[0][1],el=Math.sqrt(ex*ex+ey*ey);
+      if(el>1e-9){
+        // Normal to local straight edge candidate
+        var nx=-ey/el, ny=ex/el;
+        var D0=cu[0]*nx+cu[1]*ny, centSide=cx*nx+cy*ny, sign=(centSide>D0)?1:-1;
+        var D=D0+sign*rUse;
+        var rC=onOuter?(ctx.rOuter-rUse):(ctx.rInner+rUse);
+        var h2=rC*rC-D*D;
+        if(h2>=0){
+          var h=Math.sqrt(h2);
+          var s1=[D*nx+h*ny,D*ny-h*nx],s2=[D*nx-h*ny,D*ny+h*nx];
+          var d1=(s1[0]-cu[0])*(s1[0]-cu[0])+(s1[1]-cu[1])*(s1[1]-cu[1]);
+          var d2=(s2[0]-cu[0])*(s2[0]-cu[0])+(s2[1]-cu[1])*(s2[1]-cu[1]);
+          var in1=pointInPolygon(s1,poly),in2=pointInPolygon(s2,poly);
+          var cSel=(in1&&!in2)?s1:((in2&&!in1)?s2:((d1<d2)?s1:s2));
+          centers.push({ok:true,cornerIdx:iCorner,cx:cSel[0],cy:cSel[1],r:rUse,v:cu,method:'edge-fit'});
+          continue;
+        }
+      }
+    }
+
+    // fallback bisector
+    var prev=poly[(iCorner+n-1)%n],next=poly[(iCorner+1)%n];
+    var e1x=prev[0]-cu[0],e1y=prev[1]-cu[1],e2x=next[0]-cu[0],e2y=next[1]-cu[1];
+    var l1=Math.sqrt(e1x*e1x+e1y*e1y),l2=Math.sqrt(e2x*e2x+e2y*e2y);
+    if(l1<1e-9||l2<1e-9)continue;
+    var u1x=e1x/l1,u1y=e1y/l1,u2x=e2x/l2,u2y=e2y/l2;
+    var bisX=u1x+u2x,bisY=u1y+u2y,bisL=Math.sqrt(bisX*bisX+bisY*bisY);
+    if(bisL<1e-9)continue;
+    bisX/=bisL;bisY/=bisL;
+    var sinHalf=Math.sin(cMeta.halfA);if(sinHalf<1e-9)continue;
+    var cDist=rUse/sinHalf;
+    var cA=[cu[0]+bisX*cDist,cu[1]+bisY*cDist],cB=[cu[0]-bisX*cDist,cu[1]-bisY*cDist];
+    var dA=(cA[0]-cx)*(cA[0]-cx)+(cA[1]-cy)*(cA[1]-cy),dB=(cB[0]-cx)*(cB[0]-cx)+(cB[1]-cy)*(cB[1]-cy);
+    var cSel=(dA<dB)?cA:cB;
+    centers.push({ok:true,cornerIdx:iCorner,cx:cSel[0],cy:cSel[1],r:rUse,v:cu,method:'bisector'});
+  }
+
+  return buildWithFallback(poly, centers, 12, method.opts);
+}
+
+function pickProblemSlit(slits,targetDeg,rInner){var best=null,bestScore=1e99;for(var i=0;i<slits.length;i++){var poly=slits[i],score=1e99;for(var k=0;k<poly.length;k++){var x=poly[k][0],y=poly[k][1],ang=rad2deg(Math.atan2(y,x));if(ang<0)ang+=360;var rr=Math.sqrt(x*x+y*y);var s=Math.abs(ang-targetDeg)+0.2*Math.abs(rr-rInner);if(s<score)score=s;}if(score<bestScore){bestScore=score;best=poly;}}return best;}
+function makePanelSvg(original, rounded, failedCorners){var all=original.concat(rounded),minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;for(var i=0;i<all.length;i++){minX=Math.min(minX,all[i][0]);minY=Math.min(minY,all[i][1]);maxX=Math.max(maxX,all[i][0]);maxY=Math.max(maxY,all[i][1]);}var pad=2.5;var vb=[minX-pad,-(maxY+pad),(maxX-minX)+2*pad,(maxY-minY)+2*pad].join(' ');var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','panel');svg.setAttribute('viewBox',vb);
+  var base=document.createElementNS(svg.namespaceURI,'path');base.setAttribute('d',polygonToPath(original));base.setAttribute('fill','none');base.setAttribute('stroke','#ff8a00');base.setAttribute('stroke-width','0.3');base.setAttribute('stroke-dasharray','1 1');svg.appendChild(base);
+  var p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',polygonToPath(rounded));p.setAttribute('fill','rgba(0,180,255,0.25)');p.setAttribute('stroke','#0077aa');p.setAttribute('stroke-width','0.4');svg.appendChild(p);
+  if(failedCorners&&failedCorners.length){for(var j=0;j<failedCorners.length;j++){var idx=failedCorners[j];if(idx<0||idx>=original.length)continue;var c=document.createElementNS(svg.namespaceURI,'circle');c.setAttribute('cx',original[idx][0]);c.setAttribute('cy',-original[idx][1]);c.setAttribute('r','0.8');c.setAttribute('fill','#cc0000');svg.appendChild(c);}}
+  return svg;
+}
+
+(function run(){
+  var FL=1500,BahF=150,OF=3,Diam=205,Rh=15,Rth=5,SectorsStem_th=6,As=10,A_off=90,Sd_Sst_rat=1.5;
+  var slitsStep=OF*FL/BahF,slitsW=(Diam/2-Rth-Rth-Rh)/2,slitsD=slitsStep/(1+Sd_Sst_rat);
+  var rR1=Rh+Rth,rR2=rR1+slitsW,rR3=rR2+Rth,rR4=rR3+slitsW,stemHalf=SectorsStem_th/2;
+
+  var subA={center:90,tilt:240+A_off+As};
+  var subB={center:30,tilt:240+A_off-As};
+  var slitsA=generateSectorSlits(subA.tilt,subA.center-30,subA.center+30,rR3,rR4,stemHalf,slitsStep,slitsD);
+  var slitsB=generateSectorSlits(subB.tilt,subB.center-30,subB.center+30,rR3,rR4,stemHalf,slitsStep,slitsD);
+  var slit1=pickProblemSlit(slitsA,60,rR3),slit2=pickProblemSlit(slitsB,60,rR3);
+
+  var methods=[
+    {id:'O1',name:'O1 Adaptive Convexity + Guard',colDeg:2.5,opts:{centerInside:true,tangentTol:0.30,backoff:0.86}},
+    {id:'O2',name:'O2 Never-Skip Radius Backoff',colDeg:5.0,opts:{centerInside:true,tangentTol:0.35,backoff:0.78}},
+    {id:'O3',name:'O3 Local Edge-Model Fit',colDeg:4.0,opts:{centerInside:true,tangentTol:0.30,backoff:0.84}},
+    {id:'O4',name:'O4 Hybrid Pick-Best (area)',colDeg:3.0,opts:{centerInside:true,tangentTol:0.33,backoff:0.82}}
+  ];
+  var vals=[0.3,0.5,0.7,0.99];
+  var root=document.getElementById('root');
+  var ctxA={tiltDeg:subA.tilt,rInner:rR3,rOuter:rR4},ctxB={tiltDeg:subB.tilt,rInner:rR3,rOuter:rR4};
+
+  function runHybrid(poly,r,ctx){
+    var cands=[methods[0],methods[1],methods[2]];
+    var best=null,bArea=-1;
+    for(var i=0;i<cands.length;i++){
+      var out=roundedByMethod(poly,r,ctx,cands[i]);
+      var a=Math.abs(polyArea(out.poly||[]));
+      if(out.poly&&out.poly.length>=3&&a>bArea){best=out;bArea=a;}
+    }
+    return best||{poly:poly,failed:[]};
+  }
+
+  for(var m=0;m<methods.length;m++){
+    var ttl=document.createElement('div');ttl.className='method';ttl.textContent=methods[m].name;root.appendChild(ttl);
+    var grid=document.createElement('div');grid.className='grid';root.appendChild(grid);
+
+    for(var v=0;v<vals.length;v++){
+      var roundR=vals[v]*slitsD/2;
+      var r1,r2;
+      if(methods[m].id==='O4'){r1=runHybrid(slit1,roundR,ctxA);r2=runHybrid(slit2,roundR,ctxB);} else {r1=roundedByMethod(slit1,roundR,ctxA,methods[m]);r2=roundedByMethod(slit2,roundR,ctxB,methods[m]);}
+
+      var cell=document.createElement('div');cell.className='cell';
+      var h=document.createElement('h3');h.textContent='Rounding='+vals[v];cell.appendChild(h);
+      cell.appendChild(makePanelSvg(slit1,r1.poly||slit1,r1.failed||[]));
+      cell.appendChild(makePanelSvg(slit2,r2.poly||slit2,r2.failed||[]));
+      var lg=document.createElement('div');lg.className='legend';
+      lg.textContent='failed corners: slitA='+((r1.failed||[]).length)+' slitB='+((r2.failed||[]).length);
+      cell.appendChild(lg);
+
+      var dbg=document.createElement('pre');
+      dbg.textContent='A area='+Math.abs(polyArea(r1.poly||slit1)).toFixed(2)+'  B area='+Math.abs(polyArea(r2.poly||slit2)).toFixed(2);
+      cell.appendChild(dbg);
+
+      grid.appendChild(cell);
+    }
+  }
+})();
+</script>
+</body>
+</html>

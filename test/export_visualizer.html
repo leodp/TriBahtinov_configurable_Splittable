@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG/STL Export Visualizer - Orphan Edge Detector</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            padding: 16px;
+            min-height: 100vh;
+            overflow: auto;
+        }
+
+        @media (max-width: 1400px) {
+            body {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            display: flex;
+            flex-direction: column;
+            border: 2px solid #3e3e42;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #252526;
+        }
+        
+        .panel-title {
+            background: #007acc;
+            padding: 8px 12px;
+            font-weight: bold;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+        
+        .panel-content {
+            flex: 1;
+            overflow: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .svg-viewer, .stl-viewer {
+            flex: 1;
+            border: 1px solid #3e3e42;
+            background: #f0f0f0;
+            position: relative;
+            min-height: 300px;
+        }
+
+        .drop-active {
+            outline: 3px dashed #4ec9b0;
+            outline-offset: -3px;
+        }
+        
+        svg {
+            width: 100%;
+            height: 100%;
+            background: white;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            background: #222;
+            cursor: crosshair;
+        }
+        
+        .analysis {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 8px;
+            margin: 8px 0;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        .stat-label {
+            color: #858585;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #4ec9b0;
+        }
+        
+        .orphan {
+            color: #f48771;
+            font-weight: bold;
+        }
+        
+        .boundary-edge {
+            stroke: red !important;
+            stroke-width: 2 !important;
+        }
+        
+        .slit-edge {
+            stroke: #00ff00 !important;
+            stroke-width: 1.5 !important;
+            opacity: 0.7;
+        }
+        
+        .hole-edge {
+            stroke: #ffff00 !important;
+            stroke-width: 1.5 !important;
+            opacity: 0.7;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 6px 12px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        
+        button:hover {
+            background: #005a9e;
+        }
+        
+        button.active {
+            background: #f48771;
+        }
+        
+        .info-box {
+            background: #2d2d2d;
+            border: 1px solid #555;
+            padding: 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin: 8px 0;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        
+        .edge-list {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .edge-item {
+            padding: 2px 4px;
+            margin: 2px 0;
+            background: #3e3e42;
+            border-left: 3px solid #858585;
+            border-radius: 2px;
+        }
+        
+        .edge-item.orphan {
+            border-left-color: #f48771;
+            background: #4a2a28;
+        }
+        
+        .edge-item.chord {
+            border-left-color: #ffd700;
+        }
+        
+        .edge-item.radial {
+            border-left-color: #ff6b6b;
+        }
+
+        .edge-item.selected {
+            background: #264f78;
+            border-left-color: #4ec9b0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- SVG Panel -->
+<div class="panel">
+    <div class="panel-title">SVG Analysis</div>
+    <div class="panel-content">
+        <div class="controls">
+            <button onclick="loadSVGFile()">Load SVG File</button>
+            <button id="btnShowBoundaryEdges" class="active" onclick="toggleBoundaryEdges()">
+                Boundary Edges
+            </button>
+            <button id="btnShowSlitEdges" onclick="toggleSlitEdges()">
+                Slit Edges
+            </button>
+        </div>
+        <div class="svg-viewer" id="svgContainer"></div>
+        <div class="analysis">
+            <div class="stat">
+                <span class="stat-label">Total Paths:</span>
+                <span class="stat-value" id="svgPathCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Boundary Paths:</span>
+                <span class="stat-value" id="svgBoundaryCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Slit Paths:</span>
+                <span class="stat-value" id="svgSlitCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Suspicious Edges:</span>
+                <span class="stat-value orphan" id="svgOrphanCount">0</span>
+            </div>
+            <div id="svgSelectionInfo" class="info-box" style="display: none;">
+                Selected Path: <span id="svgSelectedPathID">-</span><br>
+                Type: <span id="svgSelectedPathType">-</span><br>
+                Length: <span id="svgSelectedPathLength">-</span>
+            </div>
+            <div id="svgPathList" class="edge-list" style="margin-top: 8px; max-height: 120px; overflow-y: auto;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- STL Panel -->
+<div class="panel">
+    <div class="panel-title">STL Analysis (3D Viewer)</div>
+    <div class="panel-content">
+        <div class="controls">
+            <button onclick="loadSTLFile()">Load STL File</button>
+            <button id="btnShowFacets" class="active" onclick="toggleFacets()">
+                Show Facets
+            </button>
+            <button id="btnColorByType" onclick="toggleColorByType()">
+                Color by Type
+            </button>
+            <button onclick="resetSTLView()">Reset View</button>
+        </div>
+        <canvas id="stlCanvas" class="stl-viewer"></canvas>
+        <div class="analysis">
+            <div class="stat">
+                <span class="stat-label">Total Facets:</span>
+                <span class="stat-value" id="stlFacetCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Top Face Facets:</span>
+                <span class="stat-value" id="stlTopCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Bottom Face Facets:</span>
+                <span class="stat-value" id="stlBottomCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Side Wall Facets:</span>
+                <span class="stat-value" id="stlSideCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Degenerate Facets:</span>
+                <span class="stat-value orphan" id="stlDegenerateCount">0</span>
+            </div>
+            <div id="stlFacetInfo" class="info-box" style="display: none;">
+                Clicked Facet: <span id="stlClickedFacetID">-</span><br>
+                Type: <span id="stlClickedFacetType">-</span><br>
+                Normal: <span id="stlClickedFacetNormal">-</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Panel -->
+<div class="panel">
+    <div class="panel-title">Issues Report</div>
+    <div class="panel-content">
+        <div class="controls">
+            <button onclick="runFullAnalysis()">Run Full Analysis</button>
+            <button onclick="exportReport()">Export Report</button>
+            <button onclick="clearReport()">Clear</button>
+        </div>
+        <div class="analysis" id="reportBox" style="flex: 1; background: #1e1e1e; border: 1px solid #3e3e42; padding: 12px; overflow-y: auto;">
+            <div style="color: #858585; font-style: italic;">Load SVG and STL files to generate report...</div>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="svgFileInput" accept=".svg" style="display:none;" onchange="processSVGFile(event)">
+<input type="file" id="stlFileInput" accept=".stl" style="display:none;" onchange="processSTLFile(event)">
+
+<script>
+// Global state
+var state = {
+    svgData: null,
+    stlData: null,
+    svgPaths: [],
+    stlFacets: [],
+    showBoundaryEdges: true,
+    showSlitEdges: false,
+    showFacets: true,
+    colorByType: false,
+    selectedFacet: -1,
+    selectedPath: -1
+};
+
+// ============================================================
+// SVG PROCESSING
+// ============================================================
+
+function loadSVGFile() {
+    document.getElementById('svgFileInput').click();
+}
+
+function processSVGFile(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    if (!/\.svg$/i.test(file.name)) {
+        alert('Please load an .svg file in the SVG panel.');
+        return;
+    }
+    
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        state.svgData = e.target.result;
+        analyzeSVG();
+    };
+    reader.readAsText(file);
+}
+
+function analyzeSVG() {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(state.svgData, 'image/svg+xml');
+    
+    if (doc.getElementsByTagName('parsererror').length > 0) {
+        alert('Error parsing SVG');
+        return;
+    }
+    
+    // Extract all paths
+    state.svgPaths = [];
+    var paths = doc.querySelectorAll('path');
+    for (var i = 0; i < paths.length; i++) {
+        var p = paths[i];
+        var d = p.getAttribute('d') || '';
+        var stroke = p.getAttribute('stroke') || 'none';
+        var fill = p.getAttribute('fill') || 'none';
+        
+        var isExportIgnore = p.getAttribute('data-export-ignore') === '1';
+        var type = 'unknown';
+        
+        if (isExportIgnore) {
+            type = 'guide';
+        } else if (stroke !== 'none') {
+            type = 'stroke'; // Slit edges
+        } else if (fill === 'black' || fill === '#000000') {
+            type = 'mask';
+        } else if (fill !== 'none') {
+            type = 'fill';
+        } else {
+            type = 'path';
+        }
+        
+        state.svgPaths.push({
+            id: i,
+            d: d,
+            stroke: stroke,
+            fill: fill,
+            type: type,
+            length: d.length,
+            isShort: d.length < 100
+        });
+    }
+    
+    displaySVG();
+    updateSVGStats();
+}
+
+function displaySVG() {
+    var container = document.getElementById('svgContainer');
+    container.innerHTML = state.svgData;
+    
+    // Apply highlighting
+    var svg = container.querySelector('svg');
+    if (!svg) return;
+    
+    var paths = svg.querySelectorAll('path');
+    for (var i = 0; i < paths.length; i++) {
+        paths[i].setAttribute('data-path-id', String(i));
+        paths[i].style.cursor = 'pointer';
+        paths[i].style.pointerEvents = state.svgPaths[i] && state.svgPaths[i].type === 'stroke' ? 'stroke' : 'visiblePainted';
+        paths[i].addEventListener('click', function(e) {
+            highlightPath(e.target);
+            e.stopPropagation();
+        });
+        
+        // Highlight boundary paths (short, at specific angles)
+        if (state.svgPaths[i] && state.svgPaths[i].isShort && state.showBoundaryEdges) {
+            paths[i].classList.add('boundary-edge');
+        }
+
+        if (state.svgPaths[i] && state.svgPaths[i].type === 'stroke' && state.showSlitEdges) {
+            paths[i].classList.add('slit-edge');
+        }
+    }
+}
+
+function updateSVGStats() {
+    var totalPaths = state.svgPaths.length;
+    var boundaryPaths = state.svgPaths.filter(function(p) { return p.isShort; }).length;
+    var slitPaths = state.svgPaths.filter(function(p) { return p.type === 'stroke'; }).length;
+    
+    document.getElementById('svgPathCount').textContent = totalPaths;
+    document.getElementById('svgBoundaryCount').textContent = boundaryPaths;
+    document.getElementById('svgSlitCount').textContent = slitPaths;
+    document.getElementById('svgOrphanCount').textContent = boundaryPaths;
+    
+    // List suspicious paths
+    var list = document.getElementById('svgPathList');
+    list.innerHTML = '';
+
+    // Always list all paths so any single edge can be selected even when there are no short-path candidates.
+    state.svgPaths.forEach(function(p) {
+        var item = document.createElement('div');
+        var klass = 'edge-item';
+        if (p.isShort) klass += ' orphan';
+        else if (p.type === 'stroke') klass += ' chord';
+        if (p.id === state.selectedPath) klass += ' selected';
+        item.className = klass;
+        item.innerHTML = 'Path ' + p.id + ': ' + p.length + ' chars (' + p.type + ')' + (p.isShort ? ' [short]' : '');
+        item.style.cursor = 'pointer';
+        item.onclick = function() { highlightPathById(p.id); };
+        list.appendChild(item);
+    });
+}
+
+function highlightPath(pathEl) {
+    var root = document.getElementById('svgContainer');
+    root.querySelectorAll('path').forEach(function(p) {
+        var originalStroke = p.getAttribute('stroke');
+        p.style.stroke = originalStroke && originalStroke !== 'none' ? originalStroke : 'none';
+        p.style.strokeWidth = '';
+        p.style.opacity = '';
+    });
+    pathEl.style.stroke = '#ff0000';
+    pathEl.style.strokeWidth = '3';
+    pathEl.style.opacity = '1';
+
+    var idAttr = pathEl.getAttribute('data-path-id');
+    var id = idAttr !== null ? parseInt(idAttr, 10) : -1;
+    if (id >= 0 && state.svgPaths[id]) {
+        state.selectedPath = id;
+        document.getElementById('svgSelectionInfo').style.display = 'block';
+        document.getElementById('svgSelectedPathID').textContent = String(id);
+        document.getElementById('svgSelectedPathType').textContent = state.svgPaths[id].type;
+        document.getElementById('svgSelectedPathLength').textContent = String(state.svgPaths[id].length);
+        updateSVGStats();
+    }
+}
+
+function highlightPathById(id) {
+    var root = document.getElementById('svgContainer');
+    var paths = root.querySelectorAll('path');
+    if (paths[id]) {
+        highlightPath(paths[id]);
+        var list = document.getElementById('svgPathList');
+        var target = list.children[id];
+        if (target && target.scrollIntoView) {
+            target.scrollIntoView({ block: 'nearest' });
+        }
+    }
+}
+
+function toggleBoundaryEdges() {
+    state.showBoundaryEdges = !state.showBoundaryEdges;
+    displaySVG();
+    document.getElementById('btnShowBoundaryEdges').classList.toggle('active');
+}
+
+function toggleSlitEdges() {
+    state.showSlitEdges = !state.showSlitEdges;
+    document.getElementById('btnShowSlitEdges').classList.toggle('active');
+}
+
+// ============================================================
+// STL PROCESSING
+// ============================================================
+
+function loadSTLFile() {
+    document.getElementById('stlFileInput').click();
+}
+
+function processSTLFile(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    if (!/\.stl$/i.test(file.name)) {
+        alert('Please load an .stl file in the STL panel.');
+        return;
+    }
+    
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var text = e.target.result;
+        parseSTL(text);
+        renderSTL();
+        updateSTLStats();
+    };
+    reader.readAsText(file);
+}
+
+function parseSTL(text) {
+    state.stlFacets = [];
+    var lines = text.split('\n');
+
+    var facetCount = 0;
+    var current = null;
+
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line) continue;
+
+        if (line.indexOf('facet normal') === 0) {
+            var parts = line.split(/\s+/);
+            var nx = parseFloat(parts[2]);
+            var ny = parseFloat(parts[3]);
+            var nz = parseFloat(parts[4]);
+            current = {
+                id: facetCount,
+                nx: nx, ny: ny, nz: nz,
+                vertices: []
+            };
+            continue;
+        }
+
+        if (current && line.indexOf('vertex') === 0) {
+            var vp = line.split(/\s+/);
+            var vertex = [parseFloat(vp[1]), parseFloat(vp[2]), parseFloat(vp[3])];
+            if (!isNaN(vertex[0]) && !isNaN(vertex[1]) && !isNaN(vertex[2])) {
+                current.vertices.push(vertex);
+            }
+            continue;
+        }
+
+        if (current && line.indexOf('endfacet') === 0) {
+            if (current.vertices.length === 3 && !isNaN(current.nx) && !isNaN(current.ny) && !isNaN(current.nz)) {
+                var mag = Math.sqrt(current.nx * current.nx + current.ny * current.ny + current.nz * current.nz);
+                var type = 'side';
+                if (Math.abs(current.nz - 1) < 0.01) type = 'top';
+                else if (Math.abs(current.nz + 1) < 0.01) type = 'bottom';
+
+                state.stlFacets.push({
+                    id: facetCount,
+                    nx: current.nx, ny: current.ny, nz: current.nz,
+                    mag: mag,
+                    type: type,
+                    v1: current.vertices[0],
+                    v2: current.vertices[1],
+                    v3: current.vertices[2],
+                    isDegenerate: mag < 1e-10
+                });
+                facetCount++;
+            }
+            current = null;
+        }
+    }
+}
+
+function renderSTL() {
+    var canvas = document.getElementById('stlCanvas');
+    var ctx = canvas.getContext('2d');
+    
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    if (state.stlFacets.length === 0) return;
+
+    var validFacets = state.stlFacets.filter(function(f) {
+        return f.v1 && f.v2 && f.v3 &&
+            isFinite(f.v1[0]) && isFinite(f.v1[1]) &&
+            isFinite(f.v2[0]) && isFinite(f.v2[1]) &&
+            isFinite(f.v3[0]) && isFinite(f.v3[1]);
+    });
+    if (validFacets.length === 0) return;
+
+    // Fit to content bounds (XY top projection).
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    validFacets.forEach(function(f) {
+        [f.v1, f.v2, f.v3].forEach(function(v) {
+            if (v[0] < minX) minX = v[0];
+            if (v[0] > maxX) maxX = v[0];
+            if (v[1] < minY) minY = v[1];
+            if (v[1] > maxY) maxY = v[1];
+        });
+    });
+
+    var spanX = Math.max(1e-6, maxX - minX);
+    var spanY = Math.max(1e-6, maxY - minY);
+    var pad = 16;
+    var scale = Math.min((canvas.width - 2 * pad) / spanX, (canvas.height - 2 * pad) / spanY);
+    var centerX = canvas.width / 2 - ((minX + maxX) / 2) * scale;
+    var centerY = canvas.height / 2 + ((minY + maxY) / 2) * scale;
+
+    if (!isFinite(centerX) || !isFinite(centerY) || !isFinite(scale) || scale <= 0) {
+        return;
+    }
+
+    validFacets.forEach(function(facet, idx) {
+        if (!facet.v1 || !facet.v2 || !facet.v3) return;
+        
+        var p1x = centerX + facet.v1[0] * scale;
+        var p1y = centerY - facet.v1[1] * scale;
+        var p2x = centerX + facet.v2[0] * scale;
+        var p2y = centerY - facet.v2[1] * scale;
+        var p3x = centerX + facet.v3[0] * scale;
+        var p3y = centerY - facet.v3[1] * scale;
+        
+        if (!state.showFacets) {
+            return;
+        } else if (state.colorByType) {
+            if (facet.type === 'top') ctx.fillStyle = '#4ec9b0';
+            else if (facet.type === 'bottom') ctx.fillStyle = '#ce9178';
+            else ctx.fillStyle = '#808080';
+        } else {
+            ctx.fillStyle = facet.isDegenerate ? '#f48771' : (facet.id === state.selectedFacet ? '#ffff00' : '#c8c8c8');
+        }
+        
+        ctx.beginPath();
+        ctx.moveTo(p1x, p1y);
+        ctx.lineTo(p2x, p2y);
+        ctx.lineTo(p3x, p3y);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#2f2f2f';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        
+        if (facet.id === state.selectedFacet) {
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+    });
+    
+    // Click handler
+    canvas.onclick = function(e) {
+        var rect = canvas.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+
+        var bestFacet = null;
+        var bestDist = Infinity;
+
+        // First pass: exact hit in rendered order (topmost first).
+        for (var i = validFacets.length - 1; i >= 0; i--) {
+            var facet = validFacets[i];
+            if (pointInTriangle(x, y, facet, scale, centerX, centerY)) {
+                bestFacet = facet;
+                break;
+            }
+        }
+
+        // Fallback: nearest facet edge/centroid within a click radius.
+        if (!bestFacet) {
+            for (var j = 0; j < validFacets.length; j++) {
+                var d = distanceToFacetScreen(x, y, validFacets[j], scale, centerX, centerY);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestFacet = validFacets[j];
+                }
+            }
+            if (bestDist > 12) {
+                bestFacet = null;
+            }
+        }
+
+        if (bestFacet) {
+            state.selectedFacet = bestFacet.id;
+            document.getElementById('stlFacetInfo').style.display = 'block';
+            document.getElementById('stlClickedFacetID').textContent = bestFacet.id;
+            document.getElementById('stlClickedFacetType').textContent = bestFacet.type;
+            document.getElementById('stlClickedFacetNormal').textContent =
+                '(' + bestFacet.nx.toFixed(3) + ', ' + bestFacet.ny.toFixed(3) + ', ' + bestFacet.nz.toFixed(3) + ')';
+            renderSTL();
+        }
+    };
+}
+
+function distanceToFacetScreen(x, y, facet, scale, cx, cy) {
+    var p1x = cx + facet.v1[0] * scale, p1y = cy - facet.v1[1] * scale;
+    var p2x = cx + facet.v2[0] * scale, p2y = cy - facet.v2[1] * scale;
+    var p3x = cx + facet.v3[0] * scale, p3y = cy - facet.v3[1] * scale;
+
+    var d1 = distancePointToSegment(x, y, p1x, p1y, p2x, p2y);
+    var d2 = distancePointToSegment(x, y, p2x, p2y, p3x, p3y);
+    var d3 = distancePointToSegment(x, y, p3x, p3y, p1x, p1y);
+    var edgeDist = Math.min(d1, d2, d3);
+
+    var cxTri = (p1x + p2x + p3x) / 3;
+    var cyTri = (p1y + p2y + p3y) / 3;
+    var centroidDist = Math.sqrt((x - cxTri) * (x - cxTri) + (y - cyTri) * (y - cyTri));
+
+    return Math.min(edgeDist, centroidDist);
+}
+
+function distancePointToSegment(px, py, x1, y1, x2, y2) {
+    var dx = x2 - x1;
+    var dy = y2 - y1;
+    var len2 = dx * dx + dy * dy;
+    if (len2 < 1e-12) {
+        return Math.sqrt((px - x1) * (px - x1) + (py - y1) * (py - y1));
+    }
+    var t = ((px - x1) * dx + (py - y1) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    var projX = x1 + t * dx;
+    var projY = y1 + t * dy;
+    return Math.sqrt((px - projX) * (px - projX) + (py - projY) * (py - projY));
+}
+
+function pointInTriangle(x, y, facet, scale, cx, cy) {
+    var p1x = cx + facet.v1[0] * scale, p1y = cy - facet.v1[1] * scale;
+    var p2x = cx + facet.v2[0] * scale, p2y = cy - facet.v2[1] * scale;
+    var p3x = cx + facet.v3[0] * scale, p3y = cy - facet.v3[1] * scale;
+    
+    var area = Math.abs((p2x-p1x)*(p3y-p1y) - (p3x-p1x)*(p2y-p1y)) / 2;
+    var a1 = Math.abs((x-p2x)*(p3y-p2y) - (p3x-p2x)*(y-p2y)) / 2;
+    var a2 = Math.abs((p1x-x)*(p3y-y) - (p3x-x)*(p1y-y)) / 2;
+    var a3 = Math.abs((p1x-p2x)*(y-p2y) - (x-p2x)*(p1y-p2y)) / 2;
+    
+    return Math.abs(area - (a1+a2+a3)) < 1;
+}
+
+function updateSTLStats() {
+    var total = state.stlFacets.length;
+    var topCount = state.stlFacets.filter(function(f) { return f.type === 'top'; }).length;
+    var bottomCount = state.stlFacets.filter(function(f) { return f.type === 'bottom'; }).length;
+    var sideCount = state.stlFacets.filter(function(f) { return f.type === 'side'; }).length;
+    var degen = state.stlFacets.filter(function(f) { return f.isDegenerate; }).length;
+    
+    document.getElementById('stlFacetCount').textContent = total;
+    document.getElementById('stlTopCount').textContent = topCount;
+    document.getElementById('stlBottomCount').textContent = bottomCount;
+    document.getElementById('stlSideCount').textContent = sideCount;
+    document.getElementById('stlDegenerateCount').textContent = degen;
+}
+
+function toggleColorByType() {
+    state.colorByType = !state.colorByType;
+    renderSTL();
+    document.getElementById('btnColorByType').classList.toggle('active');
+}
+
+function toggleFacets() {
+    state.showFacets = !state.showFacets;
+    document.getElementById('btnShowFacets').classList.toggle('active');
+    renderSTL();
+}
+
+function resetSTLView() {
+    state.selectedFacet = -1;
+    renderSTL();
+}
+
+// ============================================================
+// REPORTING
+// ============================================================
+
+function runFullAnalysis() {
+    var report = '<strong>FULL EXPORT ANALYSIS REPORT</strong><br><br>';
+    
+    report += '<strong>SVG Issues:</strong><br>';
+    var shortPaths = state.svgPaths.filter(function(p) { return p.isShort; });
+    if (shortPaths.length > 0) {
+        report += '<span class="orphan">⚠ Found ' + shortPaths.length + ' short/suspicious paths:</span><br>';
+        shortPaths.slice(0, 10).forEach(function(p) {
+            report += '&nbsp;&nbsp;- Path ' + p.id + ': ' + p.length + ' chars (' + p.type + ')<br>';
+        });
+    } else {
+        report += '✓ No obvious short paths<br>';
+    }
+    
+    report += '<br><strong>STL Issues:</strong><br>';
+    var degenFacets = state.stlFacets.filter(function(f) { return f.isDegenerate; });
+    if (degenFacets.length > 0) {
+        report += '<span class="orphan">⚠ Found ' + degenFacets.length + ' degenerate facets:</span><br>';
+        degenFacets.slice(0, 5).forEach(function(f) {
+            report += '&nbsp;&nbsp;- Facet ' + f.id + ' (' + f.type + ')<br>';
+        });
+    } else {
+        report += '✓ No degenerate facets<br>';
+    }
+    
+    report += '<br><strong>Alignment Check:</strong><br>';
+    var topFacets = state.stlFacets.filter(function(f) { return f.type === 'top'; }).length;
+    var bottomFacets = state.stlFacets.filter(function(f) { return f.type === 'bottom'; }).length;
+    if (Math.abs(topFacets - bottomFacets) <= 1) {
+        report += '✓ Top and bottom facet counts match<br>';
+    } else {
+        report += '<span class="orphan">⚠ Top/bottom mismatch: ' + topFacets + ' vs ' + bottomFacets + '</span><br>';
+    }
+    
+    document.getElementById('reportBox').innerHTML = report;
+}
+
+function exportReport() {
+    var report = 'SVG Paths: ' + state.svgPaths.length + '\n';
+    report += 'STL Facets: ' + state.stlFacets.length + '\n\n';
+    report += state.svgPaths.map(function(p) {
+        return 'Path ' + p.id + ': type=' + p.type + ', len=' + p.length + ', short=' + p.isShort;
+    }).join('\n');
+    
+    var blob = new Blob([report], { type: 'text/plain' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'export_analysis.txt';
+    a.click();
+}
+
+function clearReport() {
+    document.getElementById('reportBox').innerHTML = '<div style="color: #858585; font-style: italic;">Report cleared.</div>';
+}
+
+// ============================================================
+// DRAG & DROP + INIT
+// ============================================================
+
+function wireDropZone(el, type) {
+    if (!el) return;
+
+    el.addEventListener('dragenter', function(e) {
+        e.preventDefault();
+        el.classList.add('drop-active');
+    });
+    el.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        el.classList.add('drop-active');
+    });
+    el.addEventListener('dragleave', function() {
+        el.classList.remove('drop-active');
+    });
+    el.addEventListener('drop', function(e) {
+        e.preventDefault();
+        el.classList.remove('drop-active');
+        if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+        var f = e.dataTransfer.files[0];
+        handleDroppedFile(f, type);
+    });
+}
+
+function handleDroppedFile(file, type) {
+    if (!file) return;
+
+    var reader = new FileReader();
+    if (type === 'svg') {
+        if (!/\.svg$/i.test(file.name)) {
+            alert('Drop an .svg file into the SVG panel.');
+            return;
+        }
+        reader.onload = function(e) {
+            state.svgData = e.target.result;
+            state.selectedPath = -1;
+            analyzeSVG();
+        };
+        reader.readAsText(file);
+    } else if (type === 'stl') {
+        if (!/\.stl$/i.test(file.name)) {
+            alert('Drop an .stl file into the STL panel.');
+            return;
+        }
+        reader.onload = function(e) {
+            parseSTL(e.target.result);
+            state.selectedFacet = -1;
+            renderSTL();
+            updateSTLStats();
+        };
+        reader.readAsText(file);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+    wireDropZone(document.getElementById('svgContainer'), 'svg');
+    wireDropZone(document.getElementById('stlCanvas'), 'stl');
+});
+
+window.addEventListener('resize', function() {
+    if (state.stlFacets.length > 0) {
+        renderSTL();
+    }
+});
+</script>
+
+</body>
+</html>

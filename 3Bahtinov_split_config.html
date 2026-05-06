@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tri Bahtinov Mask, splittable, configurable</title>
+<title>Tri Bahtinov Mask, splittable, configurable — v1.4</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -232,7 +232,7 @@ body {
 
 <!-- RIGHT: Controls -->
 <div id="controls-panel">
-    <h2>Tri Bahtinov Mask, splittable, configurable</h2>
+    <h2>Tri Bahtinov Mask, splittable, configurable — v1.4</h2>
     <p class="desc">Tri-Bahtinov mask generator, based on Satakagi implementation. The mask can be split, to allow bigger masks to be 3D printed. Slits can be rotated of an offset angle. Programmed by Leonardo Della Pietra leodp@yahoo.com</p>
 
     <div class="section-title">Telescope parameters &amp; units</div>
@@ -1256,13 +1256,29 @@ function edgeIsCircleChord(a, b, radius, isOuter, tol) {
     return rm < radius - tol;
 }
 
-function edgeIsOnRadialBoundary(a, b, ang, innerR, outerR, tol) {
+function edgeIsOnRadialBoundary(a, b, ang, innerR, outerR, tol, requireSpan) {
     tol = tol || 0.05;
     var ux = Math.cos(ang), uy = Math.sin(ang);
     function distToLine(p) { return Math.abs(p[0] * uy - p[1] * ux); }
     if (distToLine(a) > tol || distToLine(b) > tol) return false;
     var ma = pointRadius(a), mb = pointRadius(b);
-    return Math.max(ma, mb) > innerR + tol && Math.min(ma, mb) < outerR - tol;
+    if (Math.max(ma, mb) <= innerR + tol || Math.min(ma, mb) >= outerR - tol) return false;
+    // When requireSpan is true, transverse edges (slit heads) at the split angle are excluded:
+    // they have both endpoints at nearly the same radius so they are NOT radial walls.
+    // Do NOT use requireSpan in computeSuppressedSideEdges — clipping-created slit edges
+    // on the radial boundary are narrow but must still be recognized as suppressed.
+    if (requireSpan && Math.abs(ma - mb) < (outerR - innerR) * 0.08) return false;
+    return true;
+}
+
+function edgesAreCoincident(e1, e2, tol) {
+    // Check if two edges are the same or reversed within tolerance
+    tol = tol || 1e-6;
+    var d1 = Math.sqrt((e1[0][0]-e2[0][0])*(e1[0][0]-e2[0][0]) + (e1[0][1]-e2[0][1])*(e1[0][1]-e2[0][1]));
+    var d2 = Math.sqrt((e1[1][0]-e2[1][0])*(e1[1][0]-e2[1][0]) + (e1[1][1]-e2[1][1])*(e1[1][1]-e2[1][1]));
+    var d3 = Math.sqrt((e1[0][0]-e2[1][0])*(e1[0][0]-e2[1][0]) + (e1[0][1]-e2[1][1])*(e1[0][1]-e2[1][1]));
+    var d4 = Math.sqrt((e1[1][0]-e2[0][0])*(e1[1][0]-e2[0][0]) + (e1[1][1]-e2[0][1])*(e1[1][1]-e2[0][1]));
+    return (d1 < tol && d2 < tol) || (d3 < tol && d4 < tol);
 }
 
 function computeSuppressedSideEdges(poly, outerR, innerR, splitStartAng, splitEndAng) {
@@ -1277,6 +1293,17 @@ function computeSuppressedSideEdges(poly, outerR, innerR, splitStartAng, splitEn
         skip.push(suppress);
     }
     return skip;
+}
+
+function polygonStrokePathWithoutSuppressedEdges(poly, skipEdges) {
+    if (!poly || poly.length < 2) return '';
+    var d = '';
+    for (var i = 0; i < poly.length; i++) {
+        if (skipEdges && skipEdges[i]) continue;
+        var a = poly[i], b = poly[(i + 1) % poly.length];
+        d += 'M' + a[0] + ',' + a[1] + 'L' + b[0] + ',' + b[1];
+    }
+    return d;
 }
 
 function splitAndFilterBoundaryChord(poly, p, startAng, endAng, rMin, tol) {
@@ -1693,25 +1720,17 @@ function drawMask() {
                      'L' + clipExtent + ',' + clipExtent +
                      'L' + (-clipExtent) + ',' + clipExtent + 'Z';
 
-    // Split-sector clipping polygon used to remove outside residues and boundary spikes.
+    // Split-sector clipping polygon.
     var splitSectorClip = null;
     if (p.Split) {
-        var splitArcResGeom = 120;
-        splitSectorClip = [[0, 0]];
-        for (var siClip = 0; siClip <= splitArcResGeom; siClip++) {
-            var aClip = deg2rad(p.SplitStartAngle + ((p.SplitEndAngle - p.SplitStartAngle) * siClip / splitArcResGeom));
-            splitSectorClip.push([(totalR + 1) * Math.cos(aClip), (totalR + 1) * Math.sin(aClip)]);
-        }
+        splitSectorClip = buildSplitSectorClip(p.SplitStartAngle, p.SplitEndAngle, totalR + 1, 120);
     }
-    var splitStartRad = deg2rad(p.SplitStartAngle);
-    var splitEndRad = deg2rad(p.SplitEndAngle);
 
-    // Add each slit polygon to the exclusion path (they become holes via evenodd)
-    // NOTE: slits are clipped to the annulus only (not the sector). The #splitClip
-    // overlay handles sector restriction visually, avoiding ghost edges at boundaries.
+    // Add each slit polygon to the exclusion path (they become holes via evenodd).
+    // In split mode these are geometrically clipped to the split sector.
     for (var i = 0; i < allSlitData.length; i++) {
         var sd = allSlitData[i];
-        var slitPoly = clipFeatureToMaskSolid(sd.poly, totalR, r_hole, null);
+        var slitPoly = clipFeatureToMaskSolid(sd.poly, totalR, r_hole, splitSectorClip);
         if (!slitPoly) continue;
         var svgPoly = [];
         for (var v = 0; v < slitPoly.length; v++) {
@@ -1721,39 +1740,25 @@ function drawMask() {
         if (slitPathD) exclusionD += slitPathD;
     }
 
-    // Add mounting holes to the exclusion path
-    // boundary holes are handled by indenting the split clip path
-    var mountingHoleCenters = [];
-    // Helper to add a single hole (round or square) to exclusion path
-    // NOTE: holes are NOT sector-clipped for SVG. The #splitClip overlay handles
-    // sector restriction visually, keeping clean circle/square shapes.
-    function addMountingHole(cx, cy, diam, shape, angle) {
-        mountingHoleCenters.push([cx, cy]);
-        if (shape === 'square') {
-            exclusionD += svgSquarePath(cx, -cy, diam, -angle);
-        } else {
-            exclusionD += svgCirclePath(cx, -cy, diam / 2);
+    // Add mounting holes to the exclusion path using the same geometry rules as STL.
+    var mountingHolePolys = buildMountingHolePolygons(
+        p,
+        totalR,
+        r_hole,
+        r_R4_outer,
+        splitSectorClip,
+        120
+    );
+    for (var mhi = 0; mhi < mountingHolePolys.length; mhi++) {
+        var holeSvgPoly = [];
+        for (var hv = 0; hv < mountingHolePolys[mhi].poly.length; hv++) {
+            holeSvgPoly.push([
+                mountingHolePolys[mhi].poly[hv][0],
+                -mountingHolePolys[mhi].poly[hv][1]
+            ]);
         }
-    }
-    // 3x mounting holes (at 0°, 120°, 240°)
-    if (p.MountingHoles3x && p.MountingHolesDiam3x > 0) {
-        var r5CR3x = (p.MountingHolesPos3x > 0) ? p.MountingHolesPos3x : (r_R4_outer + totalR) / 2;
-        for (var mhi = 0; mhi < 3; mhi++) {
-            var mhAngle = (mhi * 120 + (p.MountingHolesAngle3x || 0)) * Math.PI / 180;
-            var mhCx = r5CR3x * Math.cos(mhAngle);
-            var mhCy = r5CR3x * Math.sin(mhAngle);
-            addMountingHole(mhCx, mhCy, p.MountingHolesDiam3x, p.MountingHolesShape3x, mhAngle);
-        }
-    }
-    // 4x mounting holes (at 0°, 90°, 180°, 270°)
-    if (p.MountingHoles4x && p.MountingHolesDiam4x > 0) {
-        var r5CR4x = (p.MountingHolesPos4x > 0) ? p.MountingHolesPos4x : (r_R4_outer + totalR) / 2;
-        for (var mhi = 0; mhi < 4; mhi++) {
-            var mhAngle = (mhi * 90 + (p.MountingHolesAngle4x || 0)) * Math.PI / 180;
-            var mhCx = r5CR4x * Math.cos(mhAngle);
-            var mhCy = r5CR4x * Math.sin(mhAngle);
-            addMountingHole(mhCx, mhCy, p.MountingHolesDiam4x, p.MountingHolesShape4x, mhAngle);
-        }
+        var holePathD = polygonToPathD(holeSvgPoly);
+        if (holePathD) exclusionD += holePathD;
     }
 
     // Create defs with clipPath
@@ -1766,8 +1771,19 @@ function drawMask() {
     defs.appendChild(slitClipPath);
     svg.appendChild(defs);
 
-    // Layer 1: Black mask (outer circle minus central hole), clipped to exclude slits
-    var maskPath = svgCirclePath(0, 0, totalR) + svgCirclePath(0, 0, r_hole);
+    // Layer 1: Black mask, clipped to exclude slits and mounting holes.
+    // Split mode is a geometric intersection (annular sector), not a visual clip.
+    var maskPath = '';
+    if (p.Split) {
+        var annularSector = buildAnnularSectorPolygon(r_hole, totalR, p.SplitStartAngle, p.SplitEndAngle, 120);
+        var annularSvgPoly = [];
+        for (var ap = 0; ap < annularSector.length; ap++) {
+            annularSvgPoly.push([annularSector[ap][0], -annularSector[ap][1]]);
+        }
+        maskPath = polygonToPathD(annularSvgPoly);
+    } else {
+        maskPath = svgCirclePath(0, 0, totalR) + svgCirclePath(0, 0, r_hole);
+    }
     var maskGroup = createSvgElement('g', { 'clip-path': 'url(#slitExclusion)' });
     maskGroup.appendChild(createSvgElement('path', {
         d: maskPath,
@@ -1777,17 +1793,23 @@ function drawMask() {
     }));
     svg.appendChild(maskGroup);
 
-    // Layer 2: Colored slit edges (strokes only, no fill) for identification
-    // NOTE: strokes clipped to annulus only; #splitClip handles sector restriction.
+    // Layer 2: Colored slit edges (strokes only, no fill) for identification.
+    // In split mode these are geometrically clipped to the split sector.
     for (var i = 0; i < allSlitData.length; i++) {
         var sd = allSlitData[i];
-        var strokePoly = clipFeatureToMaskSolid(sd.poly, totalR, r_hole, null);
+        var strokePoly = clipFeatureToMaskSolid(sd.poly, totalR, r_hole, splitSectorClip);
         if (!strokePoly) continue;
         var svgPoly = [];
         for (var v = 0; v < strokePoly.length; v++) {
             svgPoly.push([strokePoly[v][0], -strokePoly[v][1]]);
         }
-        var pathD = polygonToPathD(svgPoly);
+        var pathD = '';
+        if (p.Split) {
+            var skipEdges = computeSuppressedSideEdges(strokePoly, totalR, r_hole, deg2rad(p.SplitStartAngle), deg2rad(p.SplitEndAngle));
+            pathD = polygonStrokePathWithoutSuppressedEdges(svgPoly, skipEdges);
+        } else {
+            pathD = polygonToPathD(svgPoly);
+        }
         if (pathD) {
             svg.appendChild(createSvgElement('path', {
                 d: pathD,
@@ -1818,7 +1840,7 @@ function drawMask() {
         y2: barY,
         stroke: '#000000',
         'stroke-width': 1.2,
-        'data-no-split-clip': '1'
+        'data-export-ignore': '1'
     }));
     svg.appendChild(createSvgElement('line', {
         x1: barX1,
@@ -1827,7 +1849,7 @@ function drawMask() {
         y2: barY + 3,
         stroke: '#000000',
         'stroke-width': 1,
-        'data-no-split-clip': '1'
+        'data-export-ignore': '1'
     }));
     svg.appendChild(createSvgElement('line', {
         x1: barX2,
@@ -1836,7 +1858,7 @@ function drawMask() {
         y2: barY + 3,
         stroke: '#000000',
         'stroke-width': 1,
-        'data-no-split-clip': '1'
+        'data-export-ignore': '1'
     }));
     var scaleText = createSvgElement('text', {
         x: (barX1 + barX2) / 2,
@@ -1845,110 +1867,19 @@ function drawMask() {
         'font-size': 5.6,
         'font-weight': '700',
         'text-anchor': 'middle',
-        'data-no-split-clip': '1'
+        'data-export-ignore': '1'
     });
     scaleText.textContent = labelText;
     svg.appendChild(scaleText);
 
-    // ---- SPLIT FEATURE ----
-    // If Split is enabled, clip entire mask to a circular sector
-    if (p.Split) {
-        var clipR = totalR + 1;
-        var splitArcRes = 60;
-        var splitStartA = p.SplitStartAngle; // degrees
-        var splitEndA = p.SplitEndAngle;     // degrees
-        var splitSpan = splitEndA - splitStartA;
-
-        // Detect mounting holes sitting on sector boundaries (3x and 4x)
-        var negBoundaryHole = null, posBoundaryHole = null;
-        var allMountingHoleAngles = [];
-        if (p.MountingHoles3x && p.MountingHolesDiam3x > 0) {
-            var r5CR3 = (p.MountingHolesPos3x > 0) ? p.MountingHolesPos3x : (r_R4_outer + totalR) / 2;
-            for (var mhi = 0; mhi < 3; mhi++) {
-                var mhA = (mhi * 120 + (p.MountingHolesAngle3x || 0)) * Math.PI / 180;
-                allMountingHoleAngles.push({a: mhA, r: r5CR3, holeR: p.MountingHolesDiam3x / 2});
-            }
-        }
-        if (p.MountingHoles4x && p.MountingHolesDiam4x > 0) {
-            var r5CR4 = (p.MountingHolesPos4x > 0) ? p.MountingHolesPos4x : (r_R4_outer + totalR) / 2;
-            for (var mhi = 0; mhi < 4; mhi++) {
-                var mhA = (mhi * 90 + (p.MountingHolesAngle4x || 0)) * Math.PI / 180;
-                allMountingHoleAngles.push({a: mhA, r: r5CR4, holeR: p.MountingHolesDiam4x / 2});
-            }
-        }
-        for (var mhi = 0; mhi < allMountingHoleAngles.length; mhi++) {
-            var mhInfo = allMountingHoleAngles[mhi];
-            var bnd = getMountingHoleBoundary(mhInfo.a);
-            if (bnd !== null) {
-                var hcx = mhInfo.r * Math.cos(mhInfo.a), hcy = mhInfo.r * Math.sin(mhInfo.a);
-                if (Math.abs(bnd - deg2rad(splitEndA)) < 0.02)
-                    posBoundaryHole = {cx: hcx, cy: hcy, r: mhInfo.holeR};
-                else
-                    negBoundaryHole = {cx: hcx, cy: hcy, r: mhInfo.holeR};
-            }
-        }
-
-        // Build pie wedge with semicircular indents at boundary holes
-        var splitPoly = [[0, 0]];
-
-        // Left edge (from center toward start angle) — indent if hole on this boundary
-        if (negBoundaryHole) {
-            var arcPts = holeArcIndent(negBoundaryHole.cx, negBoundaryHole.cy,
-                                       negBoundaryHole.r, deg2rad(splitStartA), true);
-            for (var ai = 0; ai < arcPts.length; ai++) splitPoly.push(arcPts[ai]);
-        }
-
-        // Outer arc from start to end
-        for (var i = 0; i <= splitArcRes; i++) {
-            var a = deg2rad(splitStartA + (splitSpan * i / splitArcRes));
-            splitPoly.push([clipR * Math.cos(a), clipR * Math.sin(a)]);
-        }
-
-        // Right edge (from end angle back to center) — indent if hole on this boundary
-        if (posBoundaryHole) {
-            var arcPts = holeArcIndent(posBoundaryHole.cx, posBoundaryHole.cy,
-                                       posBoundaryHole.r, deg2rad(splitEndA), false);
-            for (var ai = 0; ai < arcPts.length; ai++) splitPoly.push(arcPts[ai]);
-        }
-
-        splitPoly.push([0, 0]);
-
-        // Convert to SVG coords (negate y)
-        var clipD = 'M0,0';
-        for (var i = 1; i < splitPoly.length - 1; i++) {
-            clipD += 'L' + splitPoly[i][0] + ',' + (-splitPoly[i][1]);
-        }
-        clipD += 'Z';
-
-        // Create clipPath and add to existing defs
-        var clipPathEl = createSvgElement('clipPath', { id: 'splitClip' });
-        var clipShape = createSvgElement('path', { d: clipD });
-        clipPathEl.appendChild(clipShape);
-        // Add to the existing <defs> element
-        var existingDefs = svg.querySelector('defs');
-        existingDefs.appendChild(clipPathEl);
-
-        // Wrap mask content in a clipped group, but keep scale overlay visible
-        var group = createSvgElement('g', { 'clip-path': 'url(#splitClip)' });
-        var preserved = [];
-        while (svg.firstChild) {
-            var child = svg.firstChild;
-            svg.removeChild(child);
-            if (child.getAttribute && child.getAttribute('data-no-split-clip') === '1') {
-                preserved.push(child);
-            } else {
-                group.appendChild(child);
-            }
-        }
-        svg.appendChild(group);
-        for (var pi = 0; pi < preserved.length; pi++) {
-            svg.appendChild(preserved[pi]);
-        }
+    // Update SVG source textarea with export-clean content (without HTML-only overlays)
+    var exportSvg = svg.cloneNode(true);
+    var exportIgnore = exportSvg.querySelectorAll('[data-export-ignore="1"]');
+    for (var ei = 0; ei < exportIgnore.length; ei++) {
+        exportIgnore[ei].remove();
     }
-
-    // Update SVG source textarea
     var serializer = new XMLSerializer();
-    document.getElementById('svgSrc').value = serializer.serializeToString(svg);
+    document.getElementById('svgSrc').value = serializer.serializeToString(exportSvg);
 }
 
 // ============================================================
@@ -2051,6 +1982,8 @@ function handleUnitChange() {
 }
 
 function downloadSVG() {
+    readUI();
+    drawMask();
     var content = document.getElementById('svgSrc').value;
     var blob = new Blob([content], { type: 'image/svg+xml' });
     var a = document.createElement('a');
@@ -2084,6 +2017,70 @@ function makeSquarePoly(cx, cy, side, angle) {
     return corners.map(function(c) {
         return [cx + c[0] * cos - c[1] * sin, cy + c[0] * sin + c[1] * cos];
     });
+}
+
+function buildSplitSectorClip(startAngleDeg, endAngleDeg, radius, resolution) {
+    var clip = [[0, 0]];
+    var res = Math.max(12, resolution || 60);
+    for (var i = 0; i <= res; i++) {
+        var a = deg2rad(startAngleDeg + ((endAngleDeg - startAngleDeg) * i / res));
+        clip.push([radius * Math.cos(a), radius * Math.sin(a)]);
+    }
+    return clip;
+}
+
+function buildAnnularSectorPolygon(innerR, outerR, startAngleDeg, endAngleDeg, resolution) {
+    var poly = [];
+    var res = Math.max(24, resolution || 90);
+    var span = endAngleDeg - startAngleDeg;
+    for (var i = 0; i <= res; i++) {
+        var aOuter = deg2rad(startAngleDeg + (span * i / res));
+        poly.push([outerR * Math.cos(aOuter), outerR * Math.sin(aOuter)]);
+    }
+    for (var j = res; j >= 0; j--) {
+        var aInner = deg2rad(startAngleDeg + (span * j / res));
+        poly.push([innerR * Math.cos(aInner), innerR * Math.sin(aInner)]);
+    }
+    return sanitizePolygonGeneric(poly, 1e-4, 0.02) || poly;
+}
+
+function buildMountingHolePolygons(p, totalR, innerR, r4Outer, splitSectorClip, circleResBase) {
+    var holes = [];
+    var baseRes = Math.max(48, circleResBase || 120);
+
+    function addHoleGroup(count, angleStep, enabled, shape, pos, diam, angleOffsetDeg) {
+        if (!enabled || diam <= 0) return;
+        var centerR = (pos > 0) ? pos : (r4Outer + totalR) / 2;
+        for (var i = 0; i < count; i++) {
+            var angleRad = deg2rad(i * angleStep + (angleOffsetDeg || 0));
+            var cx = centerR * Math.cos(angleRad);
+            var cy = centerR * Math.sin(angleRad);
+            var raw = null;
+            if (shape === 'square') {
+                raw = makeSquarePoly(cx, cy, diam, angleRad);
+            } else {
+                var holeR = diam / 2;
+                var holeRes = Math.max(24, Math.round(baseRes * holeR / Math.max(totalR, 1e-6)));
+                raw = makeCirclePoly(cx, cy, holeR, holeRes);
+            }
+            var clipped = clipFeatureToMaskSolid(raw, totalR, innerR, splitSectorClip || null);
+            if (!clipped) continue;
+            holes.push({
+                poly: clipped,
+                shape: shape,
+                angle: angleRad,
+                cx: cx,
+                cy: cy
+            });
+        }
+    }
+
+    addHoleGroup(3, 120, p.MountingHoles3x, p.MountingHolesShape3x,
+                 p.MountingHolesPos3x, p.MountingHolesDiam3x, p.MountingHolesAngle3x || 0);
+    addHoleGroup(4, 90, p.MountingHoles4x, p.MountingHolesShape4x,
+                 p.MountingHolesPos4x, p.MountingHolesDiam4x, p.MountingHolesAngle4x || 0);
+
+    return holes;
 }
 
 // Reverse polygon winding
@@ -2207,6 +2204,8 @@ function scanlineTriangulate(outer, holes) {
 function scanlineSideWalls(boundary, thickness, facetFn) {
     for (var i = 0; i < boundary.length; i++) {
         var a = boundary[i], b = boundary[(i + 1) % boundary.length];
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        if ((dx * dx + dy * dy) < 1e-10) continue;
         facetFn([a[0],a[1],0], [b[0],b[1],0], [b[0],b[1],thickness]);
         facetFn([a[0],a[1],0], [b[0],b[1],thickness], [a[0],a[1],thickness]);
     }
@@ -2216,9 +2215,413 @@ function scanlineSideWallsSelective(boundary, skipEdges, thickness, facetFn) {
     for (var i = 0; i < boundary.length; i++) {
         if (skipEdges && skipEdges[i]) continue;
         var a = boundary[i], b = boundary[(i + 1) % boundary.length];
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        if ((dx * dx + dy * dy) < 1e-10) continue;
         facetFn([a[0],a[1],0], [b[0],b[1],0], [b[0],b[1],thickness]);
         facetFn([a[0],a[1],0], [b[0],b[1],thickness], [a[0],a[1],thickness]);
     }
+}
+
+function subtractIntervals(baseStart, baseEnd, cuts, tol) {
+    tol = tol || 1e-6;
+    var out = [[baseStart, baseEnd]];
+    for (var i = 0; i < cuts.length; i++) {
+        var c0 = cuts[i][0] - tol;
+        var c1 = cuts[i][1] + tol;
+        var next = [];
+        for (var j = 0; j < out.length; j++) {
+            var s = out[j][0], e = out[j][1];
+            if (c1 <= s || c0 >= e) {
+                next.push([s, e]);
+                continue;
+            }
+            if (c0 > s + tol) next.push([s, c0]);
+            if (c1 < e - tol) next.push([c1, e]);
+        }
+        out = next;
+        if (out.length === 0) break;
+    }
+    return out;
+}
+
+function mergeIntervals(intervals, tol) {
+    tol = tol || 1e-6;
+    if (!intervals || intervals.length === 0) return [];
+    intervals.sort(function(a, b) { return a[0] - b[0]; });
+    var merged = [intervals[0].slice()];
+    for (var i = 1; i < intervals.length; i++) {
+        var cur = intervals[i];
+        var last = merged[merged.length - 1];
+        if (cur[0] <= last[1] + tol) {
+            last[1] = Math.max(last[1], cur[1]);
+        } else {
+            merged.push(cur.slice());
+        }
+    }
+    return merged;
+}
+
+function collectRadialBoundaryCutIntervals(holes, ang, innerR, outerR, tol) {
+    tol = tol || 0.05;
+    var cuts = [];
+    var ux = Math.cos(ang), uy = Math.sin(ang);
+    
+    for (var hi = 0; hi < holes.length; hi++) {
+        var hp = holes[hi];
+        if (!hp || hp.length < 2) continue;
+        
+        // Ray-cast along the radial line to find intersections with this hole polygon
+        var intersections = [];
+        for (var i = 0; i < hp.length; i++) {
+            var a = hp[i], b = hp[(i + 1) % hp.length];
+
+            // If the hole edge lies on the split radial AND spans a significant radial
+            // range, this whole interval is a cut. Slit heads (both endpoints at same
+            // radius) are excluded — they are side walls, not radial cuts.
+            if (edgeIsOnRadialBoundary(a, b, ang, innerR, outerR, tol)) {
+                var ra = pointRadius(a), rb = pointRadius(b);
+                var s_col = Math.max(innerR, Math.min(ra, rb));
+                var e_col = Math.min(outerR, Math.max(ra, rb));
+                if (e_col - s_col > 1e-6) cuts.push([s_col, e_col]);
+                continue;
+            }
+            
+            // Find intersection of radial ray (ang, r ∈ [innerR, outerR]) with segment ab
+            var t = raySegmentIntersectionRadial(ux, uy, a, b);
+            if (t !== null && t >= innerR - tol && t <= outerR + tol) {
+                intersections.push(Math.max(innerR, Math.min(t, outerR)));
+            }
+        }
+        
+        // Sort intersections and pair them as [enter, exit]
+        intersections.sort(function(a, b) { return a - b; });
+        var uniq = [];
+        for (var ii = 0; ii < intersections.length; ii++) {
+            if (uniq.length === 0 || Math.abs(intersections[ii] - uniq[uniq.length - 1]) > 1e-4) {
+                uniq.push(intersections[ii]);
+            }
+        }
+        for (var i = 0; i + 1 < uniq.length; i += 2) {
+            var s = uniq[i], e = uniq[i + 1];
+            if (e - s > 1e-6) cuts.push([s, e]);
+        }
+    }
+    return mergeIntervals(cuts, 1e-4);
+}
+
+function raySegmentIntersectionRadial(ux, uy, a, b) {
+    // Radial ray from origin along direction (ux, uy).
+    // Find intersection with line segment from a to b.
+    // Return distance along ray (or null if no intersection).
+    var ax = b[0] - a[0], ay = b[1] - a[1];
+    var denom = ax * uy - ay * ux;
+    
+    if (Math.abs(denom) < 1e-12) return null; // parallel
+    
+    var t = (a[0] * uy - a[1] * ux) / denom;
+    if (t < -1e-9 || t > 1 + 1e-9) return null; // outside segment
+    
+    var px = a[0] + t * ax, py = a[1] + t * ay;
+    var r = Math.sqrt(px * px + py * py);
+    
+    // Verify the point is actually on the ray
+    var dotProd = px * ux + py * uy;
+    if (dotProd < -1e-9) return null; // behind ray origin
+    
+    return r;
+}
+
+function normalizeAngleRad(a) {
+    var twopi = Math.PI * 2;
+    while (a < 0) a += twopi;
+    while (a >= twopi) a -= twopi;
+    return a;
+}
+
+function shortestArcIntervals(a0, a1) {
+    // Returns one or two [start,end] intervals in [0,2pi) covering the shorter arc.
+    var twopi = Math.PI * 2;
+    a0 = normalizeAngleRad(a0);
+    a1 = normalizeAngleRad(a1);
+    var d = a1 - a0;
+    while (d < 0) d += twopi;
+    while (d >= twopi) d -= twopi;
+
+    var start, end;
+    if (d <= Math.PI) {
+        start = a0;
+        end = a1;
+    } else {
+        start = a1;
+        end = a0;
+    }
+
+    if (start <= end) return [[start, end]];
+    return [[start, twopi], [0, end]];
+}
+
+function collectCircleBoundaryCutIntervals(holes, radius, tol) {
+    tol = tol || 0.05;
+    var intervals = [];
+    for (var hi = 0; hi < holes.length; hi++) {
+        var hp = holes[hi];
+        if (!hp || hp.length < 2) continue;
+        for (var i = 0; i < hp.length; i++) {
+            var a = hp[i], b = hp[(i + 1) % hp.length];
+            if (!edgeIsCircleChord(a, b, radius, true, tol)) continue;
+            var aa = Math.atan2(a[1], a[0]);
+            var ab = Math.atan2(b[1], b[0]);
+            var arcParts = shortestArcIntervals(aa, ab);
+            for (var k = 0; k < arcParts.length; k++) intervals.push(arcParts[k]);
+        }
+    }
+    return mergeIntervals(intervals, 1e-4);
+}
+
+function angleInIntervals(a, intervals, tol) {
+    tol = tol || 1e-6;
+    a = normalizeAngleRad(a);
+    for (var i = 0; i < intervals.length; i++) {
+        if (a >= intervals[i][0] - tol && a <= intervals[i][1] + tol) return true;
+    }
+    return false;
+}
+
+function pointInAnyPolygon(pt, polys) {
+    if (!polys || polys.length === 0) return false;
+    for (var i = 0; i < polys.length; i++) {
+        if (pointInPolygon(pt, polys[i])) return true;
+    }
+    return false;
+}
+
+function scanlineSideWallsOuterSplitAware(boundary, thickness, facetFn, splitStartAng, splitEndAng, innerR, outerR, holesForCuts) {
+    var tol = 0.05;
+    var startCuts = collectRadialBoundaryCutIntervals(holesForCuts || [], splitStartAng, innerR, outerR, tol);
+    var endCuts = collectRadialBoundaryCutIntervals(holesForCuts || [], splitEndAng, innerR, outerR, tol);
+    var holePolys = holesForCuts || [];
+    var probeEps = 0.03;
+
+    for (var i = 0; i < boundary.length; i++) {
+        var a = boundary[i], b = boundary[(i + 1) % boundary.length];
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        if ((dx * dx + dy * dy) < 1e-10) continue;
+
+        // Conservative circle-edge suppression: only remove segment if a probe point on the
+        // material side of the edge is inside an actual clipped hole polygon.
+        var ra = pointRadius(a), rb = pointRadius(b);
+        var mid = [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5];
+        var rm = pointRadius(mid);
+        var ux = rm > 1e-9 ? (mid[0] / rm) : 1;
+        var uy = rm > 1e-9 ? (mid[1] / rm) : 0;
+
+        if (Math.abs(ra - outerR) <= tol && Math.abs(rb - outerR) <= tol) {
+            var outerProbe = [mid[0] - ux * probeEps, mid[1] - uy * probeEps];
+            if (pointInAnyPolygon(outerProbe, holePolys)) continue;
+        }
+        if (Math.abs(ra - innerR) <= tol && Math.abs(rb - innerR) <= tol) {
+            var innerProbe = [mid[0] + ux * probeEps, mid[1] + uy * probeEps];
+            if (pointInAnyPolygon(innerProbe, holePolys)) continue;
+        }
+
+        var useCuts = null;
+        var useAng = null;
+        if (edgeIsOnRadialBoundary(a, b, splitStartAng, innerR, outerR, tol)) {
+            useCuts = startCuts;
+            useAng = splitStartAng;
+        } else if (edgeIsOnRadialBoundary(a, b, splitEndAng, innerR, outerR, tol)) {
+            useCuts = endCuts;
+            useAng = splitEndAng;
+        }
+
+        if (!useCuts || useCuts.length === 0) {
+            facetFn([a[0],a[1],0], [b[0],b[1],0], [b[0],b[1],thickness]);
+            facetFn([a[0],a[1],0], [b[0],b[1],thickness], [a[0],a[1],thickness]);
+            continue;
+        }
+
+        var rMin = Math.min(ra, rb), rMax = Math.max(ra, rb);
+        var kept = subtractIntervals(rMin, rMax, useCuts, 1e-4);
+        if (!kept.length) continue;
+
+        var ux = Math.cos(useAng), uy = Math.sin(useAng);
+        var increasing = (rb >= ra);
+        for (var ki = 0; ki < kept.length; ki++) {
+            var s = kept[ki][0], e = kept[ki][1];
+            if (e - s < 1e-6) continue;
+            var p0 = [ux * (increasing ? s : e), uy * (increasing ? s : e)];
+            var p1 = [ux * (increasing ? e : s), uy * (increasing ? e : s)];
+            facetFn([p0[0],p0[1],0], [p1[0],p1[1],0], [p1[0],p1[1],thickness]);
+            facetFn([p0[0],p0[1],0], [p1[0],p1[1],thickness], [p0[0],p0[1],thickness]);
+        }
+    }
+}
+
+function quantizeCoord(v, eps) {
+    eps = eps || 1e-6;
+    return Math.round(v / eps) * eps;
+}
+
+function vertexKey2D(v, eps) {
+    var qx = quantizeCoord(v[0], eps);
+    var qy = quantizeCoord(v[1], eps);
+    return qx + ',' + qy;
+}
+
+function extractBoundaryEdgesFromTriangles(triangles, eps) {
+    eps = eps || 1e-8;
+    var edgeMap = {};
+
+    function addDirectedEdge(a, b) {
+        var ka = vertexKey2D(a, eps);
+        var kb = vertexKey2D(b, eps);
+        if (ka === kb) return;
+
+        var undirected = (ka < kb) ? (ka + '|' + kb) : (kb + '|' + ka);
+        if (!edgeMap[undirected]) {
+            edgeMap[undirected] = {
+                count: 1,
+                // Keep original coordinates for emission; only keys are quantized.
+                a: [a[0], a[1]],
+                b: [b[0], b[1]]
+            };
+        } else {
+            edgeMap[undirected].count += 1;
+        }
+    }
+
+    for (var i = 0; i < triangles.length; i++) {
+        var t = triangles[i];
+        addDirectedEdge(t[0], t[1]);
+        addDirectedEdge(t[1], t[2]);
+        addDirectedEdge(t[2], t[0]);
+    }
+
+    var edges = [];
+    for (var k in edgeMap) {
+        if (!edgeMap.hasOwnProperty(k)) continue;
+        var e = edgeMap[k];
+        if (e.count === 1) {
+            edges.push([e.a, e.b]);
+        }
+    }
+    return edges;
+}
+
+function keepLargestTriangleComponent(triangles, eps) {
+    eps = eps || 1e-6;
+    if (!triangles || triangles.length === 0) return [];
+
+    var vertToTri = {};
+    for (var i = 0; i < triangles.length; i++) {
+        var t = triangles[i];
+        for (var j = 0; j < 3; j++) {
+            var k = vertexKey2D(t[j], eps);
+            if (!vertToTri[k]) vertToTri[k] = [];
+            vertToTri[k].push(i);
+        }
+    }
+
+    var seen = new Array(triangles.length);
+    for (var si = 0; si < seen.length; si++) seen[si] = false;
+    var bestComp = null;
+
+    for (var seed = 0; seed < triangles.length; seed++) {
+        if (seen[seed]) continue;
+        var q = [seed];
+        seen[seed] = true;
+        var qi = 0;
+        var comp = [];
+
+        while (qi < q.length) {
+            var id = q[qi++];
+            comp.push(id);
+            var tri = triangles[id];
+            for (var v = 0; v < 3; v++) {
+                var vk = vertexKey2D(tri[v], eps);
+                var nbrs = vertToTri[vk] || [];
+                for (var n = 0; n < nbrs.length; n++) {
+                    var nid = nbrs[n];
+                    if (!seen[nid]) {
+                        seen[nid] = true;
+                        q.push(nid);
+                    }
+                }
+            }
+        }
+
+        if (!bestComp || comp.length > bestComp.length) bestComp = comp;
+    }
+
+    if (!bestComp) return triangles;
+    var out = [];
+    for (var i = 0; i < bestComp.length; i++) out.push(triangles[bestComp[i]]);
+    return out;
+}
+
+function emitSideWallsFromBoundaryEdges(edges, thickness, facetFn) {
+    for (var i = 0; i < edges.length; i++) {
+        var a = edges[i][0], b = edges[i][1];
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        // Keep very small closing edges; skipping them can leave corner pinholes.
+        if ((dx * dx + dy * dy) < 1e-14) continue;
+        facetFn([a[0],a[1],0], [b[0],b[1],0], [b[0],b[1],thickness]);
+        facetFn([a[0],a[1],0], [b[0],b[1],thickness], [a[0],a[1],thickness]);
+    }
+}
+
+function filterOutRadialBoundaryEdges(edges, splitStartAng, splitEndAng, innerR, outerR, tol) {
+    tol = tol || 0.05;
+    var out = [];
+    for (var i = 0; i < edges.length; i++) {
+        var a = edges[i][0], b = edges[i][1];
+        if (edgeIsOnRadialBoundary(a, b, splitStartAng, innerR, outerR, tol)) continue;
+        if (edgeIsOnRadialBoundary(a, b, splitEndAng, innerR, outerR, tol)) continue;
+        out.push(edges[i]);
+    }
+    return out;
+}
+
+function emitOuterBoundaryWalls(outerPoly, thickness, facetFn, splitStartAng, splitEndAng, innerR, outerR) {
+    // Emit side walls for the outer boundary polygon directly from its known vertices.
+    // This is the outer circle (far from interior holes), so no hole-filtering needed.
+    // In split mode, only skip the two radial boundary edges (owned by emitGuaranteedSplitRadialWalls).
+    var tol = 0.05;
+    for (var i = 0; i < outerPoly.length; i++) {
+        var a = outerPoly[i], b = outerPoly[(i + 1) % outerPoly.length];
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        if ((dx * dx + dy * dy) < 1e-14) continue;
+        if (splitStartAng !== undefined) {
+            if (edgeIsOnRadialBoundary(a, b, splitStartAng, innerR, outerR, tol)) continue;
+            if (edgeIsOnRadialBoundary(a, b, splitEndAng, innerR, outerR, tol)) continue;
+        }
+        facetFn([a[0],a[1],0], [b[0],b[1],0], [b[0],b[1],thickness]);
+        facetFn([a[0],a[1],0], [b[0],b[1],thickness], [a[0],a[1],thickness]);
+    }
+}
+function emitGuaranteedSplitRadialWalls(splitStartAng, splitEndAng, innerR, outerR, holesForCuts, thickness, facetFn) {
+    // This pass exclusively owns the two straight split-radial walls.
+    // The topology boundary-edge pass has already had those edges stripped,
+    // so there is no overlap and no heuristic coverage check needed.
+    var tol = 0.05;
+    var startCuts = collectRadialBoundaryCutIntervals(holesForCuts || [], splitStartAng, innerR, outerR, tol);
+    var endCuts = collectRadialBoundaryCutIntervals(holesForCuts || [], splitEndAng, innerR, outerR, tol);
+
+    function emitOneBoundary(ang, cuts) {
+        var kept = subtractIntervals(innerR, outerR, cuts || [], 1e-4);
+        var ux = Math.cos(ang), uy = Math.sin(ang);
+        for (var i = 0; i < kept.length; i++) {
+            var s = kept[i][0], e = kept[i][1];
+            if (e - s < 1e-9) continue;
+            var p0 = [ux * s, uy * s];
+            var p1 = [ux * e, uy * e];
+            facetFn([p0[0],p0[1],0], [p1[0],p1[1],0], [p1[0],p1[1],thickness]);
+            facetFn([p0[0],p0[1],0], [p1[0],p1[1],thickness], [p0[0],p0[1],thickness]);
+        }
+    }
+
+    emitOneBoundary(splitStartAng, startCuts);
+    emitOneBoundary(splitEndAng, endCuts);
 }
 
 // Generate STL using scanline exact triangulation
@@ -2227,6 +2630,9 @@ function generateSTL_Scanline() {
     var thickness = p.Thickness3D;
     var circleRes = 120;
     var isInches = (document.getElementById('units').value === 'inches');
+    var splitSectorClip = p.Split
+        ? buildSplitSectorClip(p.SplitStartAngle, p.SplitEndAngle, p.TDiam / 2 + 1, 60)
+        : null;
 
     // Outer boundary (CCW)
     var outerPoly = makeCirclePoly(0, 0, p.TDiam / 2, circleRes);
@@ -2247,54 +2653,19 @@ function generateSTL_Scanline() {
             holeSkipEdges.push(null);
         }
     }
-    var boundaryMH = {};
-    // 3x mounting holes
-    if (p.MountingHoles3x && p.MountingHolesDiam3x > 0) {
-        var r5CenterR = (p.MountingHolesPos3x > 0) ? p.MountingHolesPos3x : (derived.r_R4_outer + p.TDiam / 2) / 2;
-        var holeR3 = p.MountingHolesDiam3x / 2;
-        var mhRes = Math.max(24, Math.round(circleRes * holeR3 / (p.TDiam / 2)));
-        for (var mhi = 0; mhi < 3; mhi++) {
-            var mhAngle = (mhi * 120 + (p.MountingHolesAngle3x || 0)) * Math.PI / 180;
-            var mhCx = r5CenterR * Math.cos(mhAngle), mhCy = r5CenterR * Math.sin(mhAngle);
-            var idx = allHoles.length;
-            var rawHole3 = null;
-            if (p.MountingHolesShape3x === 'square') {
-                rawHole3 = makeSquarePoly(mhCx, mhCy, p.MountingHolesDiam3x, mhAngle);
-            } else {
-                rawHole3 = makeCirclePoly(mhCx, mhCy, holeR3, mhRes);
-            }
-            var clippedHole3 = clipFeatureToMaskSolid(rawHole3, p.TDiam / 2, p.Rh, null);
-            if (!clippedHole3) continue;
-            var cwHole3 = ensureCW(clippedHole3);
-            allHoles.push(cwHole3);
-            holeKinds.push('mounting');
-            holeSkipEdges.push(computeSuppressedSideEdges(cwHole3, p.TDiam / 2, p.Rh, null, null));
-            if (getMountingHoleBoundary(mhAngle) !== null) boundaryMH[idx] = true;
-        }
-    }
-    // 4x mounting holes
-    if (p.MountingHoles4x && p.MountingHolesDiam4x > 0) {
-        var r5CenterR4 = (p.MountingHolesPos4x > 0) ? p.MountingHolesPos4x : (derived.r_R4_outer + p.TDiam / 2) / 2;
-        var holeR4 = p.MountingHolesDiam4x / 2;
-        var mhRes4 = Math.max(24, Math.round(circleRes * holeR4 / (p.TDiam / 2)));
-        for (var mhi = 0; mhi < 4; mhi++) {
-            var mhAngle = (mhi * 90 + (p.MountingHolesAngle4x || 0)) * Math.PI / 180;
-            var mhCx = r5CenterR4 * Math.cos(mhAngle), mhCy = r5CenterR4 * Math.sin(mhAngle);
-            var idx = allHoles.length;
-            var rawHole4 = null;
-            if (p.MountingHolesShape4x === 'square') {
-                rawHole4 = makeSquarePoly(mhCx, mhCy, p.MountingHolesDiam4x, mhAngle);
-            } else {
-                rawHole4 = makeCirclePoly(mhCx, mhCy, holeR4, mhRes4);
-            }
-            var clippedHole4 = clipFeatureToMaskSolid(rawHole4, p.TDiam / 2, p.Rh, null);
-            if (!clippedHole4) continue;
-            var cwHole4 = ensureCW(clippedHole4);
-            allHoles.push(cwHole4);
-            holeKinds.push('mounting');
-            holeSkipEdges.push(computeSuppressedSideEdges(cwHole4, p.TDiam / 2, p.Rh, null, null));
-            if (getMountingHoleBoundary(mhAngle) !== null) boundaryMH[idx] = true;
-        }
+    var mountingHolePolys = buildMountingHolePolygons(
+        p,
+        p.TDiam / 2,
+        p.Rh,
+        derived.r_R4_outer,
+        splitSectorClip,
+        circleRes
+    );
+    for (var mhi = 0; mhi < mountingHolePolys.length; mhi++) {
+        var cwMountHole = ensureCW(mountingHolePolys[mhi].poly);
+        allHoles.push(cwMountHole);
+        holeKinds.push('mounting');
+        holeSkipEdges.push(computeSuppressedSideEdges(cwMountHole, p.TDiam / 2, p.Rh, null, null));
     }
 
     // Handle split mode
@@ -2305,50 +2676,15 @@ function generateSTL_Scanline() {
         var splitEndA = p.SplitEndAngle;
         var splitSpan = splitEndA - splitStartA;
 
-        // Detect boundary mounting holes for sector indent
-        var negBH = null, posBH = null;
-        var allMHAngles = [];
-        if (p.MountingHoles3x && p.MountingHolesDiam3x > 0) {
-            var r5CR3 = (p.MountingHolesPos3x > 0) ? p.MountingHolesPos3x : (derived.r_R4_outer + p.TDiam / 2) / 2;
-            for (var mhi = 0; mhi < 3; mhi++) {
-                allMHAngles.push({a: (mhi * 120 + (p.MountingHolesAngle3x || 0)) * Math.PI / 180, r: r5CR3, holeR: p.MountingHolesDiam3x / 2});
-            }
-        }
-        if (p.MountingHoles4x && p.MountingHolesDiam4x > 0) {
-            var r5CR4 = (p.MountingHolesPos4x > 0) ? p.MountingHolesPos4x : (derived.r_R4_outer + p.TDiam / 2) / 2;
-            for (var mhi = 0; mhi < 4; mhi++) {
-                allMHAngles.push({a: (mhi * 90 + (p.MountingHolesAngle4x || 0)) * Math.PI / 180, r: r5CR4, holeR: p.MountingHolesDiam4x / 2});
-            }
-        }
-        for (var mhi = 0; mhi < allMHAngles.length; mhi++) {
-            var info = allMHAngles[mhi];
-            var bnd = getMountingHoleBoundary(info.a);
-            if (bnd !== null) {
-                var hcx = info.r * Math.cos(info.a), hcy = info.r * Math.sin(info.a);
-                if (Math.abs(bnd - deg2rad(splitEndA)) < 0.02)
-                    posBH = {cx: hcx, cy: hcy, r: info.holeR};
-                else
-                    negBH = {cx: hcx, cy: hcy, r: info.holeR};
-            }
-        }
-
-        // Build annular sector with semicircular indents at boundary holes
+        // Build annular sector.
         var annularSector = [];
         for (var i = 0; i <= splitRes; i++) {
             var a = deg2rad(splitStartA + (splitSpan * i / splitRes));
             annularSector.push([totalR_val * Math.cos(a), totalR_val * Math.sin(a)]);
         }
-        if (posBH) {
-            var arcPts = holeArcIndent(posBH.cx, posBH.cy, posBH.r, deg2rad(splitEndA), false);
-            for (var ai = 0; ai < arcPts.length; ai++) annularSector.push(arcPts[ai]);
-        }
         for (var i = splitRes; i >= 0; i--) {
             var a = deg2rad(splitStartA + (splitSpan * i / splitRes));
             annularSector.push([p.Rh * Math.cos(a), p.Rh * Math.sin(a)]);
-        }
-        if (negBH) {
-            var arcPts = holeArcIndent(negBH.cx, negBH.cy, negBH.r, deg2rad(splitStartA), true);
-            for (var ai = 0; ai < arcPts.length; ai++) annularSector.push(arcPts[ai]);
         }
         outerPoly = sanitizePolygonGeneric(annularSector, 1e-3, 0.02);
         if (!outerPoly) outerPoly = annularSector;
@@ -2372,7 +2708,6 @@ function generateSTL_Scanline() {
                 if (Math.abs(d - p.Rh) > 1) { isCentralHole = false; break; }
             }
             if (isCentralHole) continue;
-            if (boundaryMH[i]) continue;
             if (hk === 'slit') {
                 var clippedSlit = clipFeatureToMaskSolid(hp, totalR_val, p.Rh, sectorClip);
                 if (!clippedSlit) continue;
@@ -2384,7 +2719,7 @@ function generateSTL_Scanline() {
                 }
                 continue;
             }
-            var clipped = sanitizePolygonGeneric(sutherlandHodgman(hp, sectorClip), 1e-4, 0.02);
+            var clipped = clipFeatureToMaskSolid(hp, totalR_val, p.Rh, sectorClip);
             if (clipped && clipped.length >= 3) {
                 var cwClipped = ensureCW(clipped);
                 filteredHoles.push(cwClipped);
@@ -2397,6 +2732,7 @@ function generateSTL_Scanline() {
 
     // Scanline triangulate (exact polygon intersections, even-odd fill)
     var triangles = scanlineTriangulate(outerPoly, allHoles);
+    triangles = keepLargestTriangleComponent(triangles, 1e-6);
 
     // Build STL
     var unitStr = isInches ? 'inches' : 'mm';
@@ -2412,7 +2748,8 @@ function generateSTL_Scanline() {
         var v = [p3[0]-p1[0], p3[1]-p1[1], p3[2]-p1[2]];
         var nx = u[1]*v[2]-u[2]*v[1], ny = u[2]*v[0]-u[0]*v[2], nz = u[0]*v[1]-u[1]*v[0];
         var nl = Math.sqrt(nx*nx+ny*ny+nz*nz);
-        if (nl > 1e-12) { nx/=nl; ny/=nl; nz/=nl; }
+        if (nl <= 1e-12) return;
+        nx/=nl; ny/=nl; nz/=nl;
         stl += '  facet normal '+nx+' '+ny+' '+nz+'\n';
         stl += '    outer loop\n';
         stl += '      vertex '+p1[0]+' '+p1[1]+' '+p1[2]+'\n';
@@ -2432,10 +2769,134 @@ function generateSTL_Scanline() {
         var t = triangles[i];
         facet([t[0][0],t[0][1],0], [t[2][0],t[2][1],0], [t[1][0],t[1][1],0]);
     }
-    // Side walls from original boundaries (outer + each hole)
-    scanlineSideWalls(outerPoly, thickness, facet);
-    for (var i = 0; i < allHoles.length; i++) {
-        scanlineSideWallsSelective(allHoles[i], holeSkipEdges[i], thickness, facet);
+    // Side walls from actual filled-region boundary edges.
+    // In split mode, topology owns non-radial boundaries; radial walls are owned by the patch pass below.
+    var boundaryEdges = extractBoundaryEdgesFromTriangles(triangles, 1e-6);
+
+    function pointNearSegment(p, a, b, tol) {
+        var vx = b[0] - a[0], vy = b[1] - a[1];
+        var wx = p[0] - a[0], wy = p[1] - a[1];
+        var vv = vx * vx + vy * vy;
+        if (vv < 1e-14) {
+            var ddx = p[0] - a[0], ddy = p[1] - a[1];
+            return (ddx * ddx + ddy * ddy) <= (tol * tol);
+        }
+        var t = (wx * vx + wy * vy) / vv;
+        if (t < -0.02 || t > 1.02) return false;
+        var qx = a[0] + t * vx, qy = a[1] + t * vy;
+        var dx = p[0] - qx, dy = p[1] - qy;
+        return (dx * dx + dy * dy) <= (tol * tol);
+    }
+
+    function edgeMatchesSuppressedHoleEdge(e, holes, skipEdgesArray, tol) {
+        // Only suppress edges that lie on the inner or outer ring circle — never slit body edges.
+        var ra0 = pointRadius(e[0]), ra1 = pointRadius(e[1]);
+        var innerR = p.Rh, outerR = p.TDiam / 2;
+        var ringTol = 0.3;
+        var onInner = Math.abs(ra0 - innerR) <= ringTol && Math.abs(ra1 - innerR) <= ringTol;
+        var onOuter = Math.abs(ra0 - outerR) <= ringTol && Math.abs(ra1 - outerR) <= ringTol;
+        if (!onInner && !onOuter) return false;
+
+        for (var hi = 0; hi < holes.length; hi++) {
+            var hp = holes[hi];
+            var skip = skipEdgesArray[hi];
+            if (!hp || !skip) continue;
+            for (var si = 0; si < hp.length; si++) {
+                if (!skip[si]) continue;
+                var a = hp[si], b = hp[(si + 1) % hp.length];
+                var fwd = pointNearSegment(e[0], a, b, tol) && pointNearSegment(e[1], a, b, tol);
+                var rev = pointNearSegment(e[0], b, a, tol) && pointNearSegment(e[1], b, a, tol);
+                if (fwd || rev) return true;
+            }
+        }
+        return false;
+    }
+
+    if (p.Split) {
+        // Own the split outer-ring wall directly from the known split boundary polygon.
+        emitOuterBoundaryWalls(
+            outerPoly,
+            thickness,
+            facet,
+            deg2rad(p.SplitStartAngle),
+            deg2rad(p.SplitEndAngle),
+            p.Rh,
+            p.TDiam / 2
+        );
+
+        var splitStartAngTopo = deg2rad(p.SplitStartAngle);
+        var splitEndAngTopo = deg2rad(p.SplitEndAngle);
+        boundaryEdges = boundaryEdges.filter(function(e) {
+            if (edgeIsOnRadialBoundary(e[0], e[1], splitStartAngTopo, p.Rh, p.TDiam / 2, 0.05, true)) return false;
+            if (edgeIsOnRadialBoundary(e[0], e[1], splitEndAngTopo, p.Rh, p.TDiam / 2, 0.05, true)) return false;
+            // Outer arc is already emitted by emitOuterBoundaryWalls above.
+            var ra = pointRadius(e[0]), rb = pointRadius(e[1]);
+            if (Math.abs(ra - (p.TDiam / 2)) <= 0.05 && Math.abs(rb - (p.TDiam / 2)) <= 0.05) return false;
+            if (edgeMatchesSuppressedHoleEdge(e, allHoles, holeSkipEdges, 0.12)) return false;
+            return true;
+        });
+    }
+
+    emitSideWallsFromBoundaryEdges(boundaryEdges, thickness, facet);
+
+    // In split mode, only patch missing radial-wall pieces.
+    // This closes corner gaps without reintroducing slit/hole fragments.
+    if (p.Split) {
+        var splitStartAng = deg2rad(p.SplitStartAngle);
+        var splitEndAng = deg2rad(p.SplitEndAngle);
+        var radialTol = 0.05;
+
+        function collectExistingRadialIntervals(edges, ang, innerR, outerR, tol) {
+            var segs = [];
+            for (var ei = 0; ei < edges.length; ei++) {
+                var ea = edges[ei][0], eb = edges[ei][1];
+                if (!edgeIsOnRadialBoundary(ea, eb, ang, innerR, outerR, tol, true)) continue;
+                var ra = pointRadius(ea), rb = pointRadius(eb);
+                var s = Math.max(innerR, Math.min(ra, rb));
+                var e = Math.min(outerR, Math.max(ra, rb));
+                if (e - s > 1e-6) segs.push([s, e]);
+            }
+            return mergeIntervals(segs, 1e-4);
+        }
+
+        function emitRadialMissing(ang) {
+            var desired = subtractIntervals(
+                p.Rh,
+                p.TDiam / 2,
+                collectRadialBoundaryCutIntervals(allHoles, ang, p.Rh, p.TDiam / 2, radialTol),
+                1e-4
+            );
+            var existing = collectExistingRadialIntervals(boundaryEdges, ang, p.Rh, p.TDiam / 2, radialTol);
+            var missing = desired.slice();
+            for (var ci = 0; ci < existing.length; ci++) {
+                var nextMissing = [];
+                for (var mi = 0; mi < missing.length; mi++) {
+                    var ms = missing[mi][0], me = missing[mi][1];
+                    var cs = existing[ci][0], ce = existing[ci][1];
+                    if (ce <= ms + 1e-6 || cs >= me - 1e-6) {
+                        nextMissing.push([ms, me]);
+                        continue;
+                    }
+                    if (cs > ms + 1e-6) nextMissing.push([ms, cs]);
+                    if (ce < me - 1e-6) nextMissing.push([ce, me]);
+                }
+                missing = nextMissing;
+                if (missing.length === 0) break;
+            }
+
+            var ux = Math.cos(ang), uy = Math.sin(ang);
+            for (var i = 0; i < missing.length; i++) {
+                var s = missing[i][0], e = missing[i][1];
+                if (e - s < 1e-6) continue;
+                var p0 = [ux * s, uy * s];
+                var p1 = [ux * e, uy * e];
+                facet([p0[0],p0[1],0], [p1[0],p1[1],0], [p1[0],p1[1],thickness]);
+                facet([p0[0],p0[1],0], [p1[0],p1[1],thickness], [p0[0],p0[1],thickness]);
+            }
+        }
+
+        emitRadialMissing(splitStartAng);
+        emitRadialMissing(splitEndAng);
     }
 
     stl += 'endsolid 3Bahtinov\n';
@@ -2443,6 +2904,8 @@ function generateSTL_Scanline() {
 }
 
 function downloadSTL_Scanline() {
+    readUI();
+    drawMask();
     var stlContent = generateSTL_Scanline();
     var blob = new Blob([stlContent], { type: 'application/sla' });
     var a = document.createElement('a');
@@ -2964,6 +3427,405 @@ function initFFTUI() {
 
     document.getElementById('btnFftCompute').addEventListener('click', computeFFTSection);
     document.getElementById('btnFftDownload').addEventListener('click', downloadFftFi);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+// ============================================================
+// EDGE-CASE VALIDATION FOR BOUNDARY ORPHANS
+// ============================================================
+// Debug/test functions to validate three edge cases:
+// 1. Holes at sector boundary (3x holes, rotation 60°, split 1/3)
+// 2. Holes at radial boundary (mounting 110mm, rotation 0°, split modes)
+// 3. Slits at offset boundary (Bahtinov offset 90°, split 1/6)
+
+function debugSetup(scenario) {
+    // Helper to set up test parameters for each scenario
+    readUI();
+    switch(scenario) {
+        case 'A':
+            // Scenario A: 3 holes, rotation 60°, split 1/3
+            document.getElementById('mountingHoles3x').checked = true;
+            document.getElementById('mountingHolesAngle3x').value = '60';
+            document.getElementById('splitMaskMode').value = '1/3';
+            break;
+        case 'B':
+            // Scenario B: mounting 110mm, rotation 0°
+            document.getElementById('mountingHoles3x').checked = true;
+            document.getElementById('mountingHolesPos3x').value = '110';
+            document.getElementById('mountingHolesAngle3x').value = '0';
+            document.getElementById('splitMaskMode').value = '1/3';
+            break;
+        case 'C':
+            // Scenario C: Bahtinov offset 90°, split 1/6
+            document.getElementById('offsetAngle').value = '90';
+            document.getElementById('splitMaskMode').value = '1/6';
+            break;
+    }
+    readUI();
+    drawMask();
+}
+
+function validateOrphanEdges(geometry, radiusOuter, radiusInner, splitStartAng, splitEndAng) {
+    // Check for orphan edges: edges that lie exactly on split sector boundary
+    // or circle chords that should be suppressed.
+    // geometry: polygon array
+    // Returns: array of suspicious edges (orphan candidates)
+    
+    var orphans = [];
+    var tol = 0.1; // tolerance for radial boundary detection
+    
+    for (var i = 0; i < geometry.length; i++) {
+        var a = geometry[i];
+        var b = geometry[(i + 1) % geometry.length];
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        var edgeLen = Math.sqrt(dx * dx + dy * dy);
+        
+        if (edgeLen < 1e-6) continue; // Skip zero-length edges (already filtered)
+        
+        // Check if edge is a circle chord (should be suppressed)
+        var raA = pointRadius(a), raB = pointRadius(b);
+        if ((Math.abs(raA - radiusOuter) < tol && Math.abs(raB - radiusOuter) < tol) ||
+            (Math.abs(raA - radiusInner) < tol && Math.abs(raB - radiusInner) < tol)) {
+            var mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+            var raMid = pointRadius(mid);
+            if (raMid < Math.max(radiusOuter, radiusInner) - tol) {
+                orphans.push({
+                    type: 'circleChord',
+                    edge: [a, b],
+                    shouldSuppress: true
+                });
+            }
+        }
+        
+        // Check if edge is on radial boundary (at split sector cut)
+        if (splitStartAng != null && Math.abs(edgeLen) > tol) {
+            if (edgeIsOnRadialBoundary(a, b, splitStartAng, radiusInner, radiusOuter, tol) ||
+                edgeIsOnRadialBoundary(a, b, splitEndAng, radiusInner, radiusOuter, tol)) {
+                orphans.push({
+                    type: 'radialBoundary',
+                    edge: [a, b],
+                    shouldSuppress: true
+                });
+            }
+        }
+    }
+    
+    return orphans;
+}
+
+function analyzePolygonForOrphans(poly, name, radiusOuter, radiusInner) {
+    // Analyze a single polygon for suspicious edges
+    var splitStartAng = params.Split ? deg2rad(params.SplitStartAngle) : null;
+    var splitEndAng = params.Split ? deg2rad(params.SplitEndAngle) : null;
+    
+    var orphans = validateOrphanEdges(poly, radiusOuter, radiusInner, splitStartAng, splitEndAng);
+    
+    if (orphans.length > 0) {
+        console.warn('ORPHAN EDGES DETECTED in ' + name + ':', orphans);
+        return false;
+    }
+    return true;
+}
+
+function testScenario(scenarioChar) {
+    // Comprehensive test of one scenario
+    debugSetup(scenarioChar);
+    
+    var p = params;
+    var totalR = p.TDiam / 2;
+    var r_hole = p.Rh;
+    var r_R4_outer = derived.r_R4_outer;
+    var splitSectorClip = p.Split
+        ? buildSplitSectorClip(p.SplitStartAngle, p.SplitEndAngle, totalR + 1, 60)
+        : null;
+    
+    console.log('\n=== SCENARIO ' + scenarioChar + ' ===');
+    console.log('Config:', {
+        split: p.SplitMode,
+        mounting3x: p.MountingHoles3x,
+        pos3x: p.MountingHolesPos3x,
+        angle3x: p.MountingHolesAngle3x,
+        offset: p.A_off
+    });
+    
+    // Test mounting hole geometry
+    var mountingHoles = buildMountingHolePolygons(
+        p, totalR, r_hole, r_R4_outer, splitSectorClip, 120
+    );
+    
+    console.log('Mounting holes count:', mountingHoles.length);
+    
+    var allClean = true;
+    var splitStartAng = p.Split ? deg2rad(p.SplitStartAngle) : null;
+    var splitEndAng = p.Split ? deg2rad(p.SplitEndAngle) : null;
+    
+    for (var i = 0; i < mountingHoles.length; i++) {
+        var holePoly = mountingHoles[i].poly;
+        var skipFlags = computeSuppressedSideEdges(holePoly, totalR, r_hole, splitStartAng, splitEndAng);
+        var suppressedCount = skipFlags.filter(function(f){return f;}).length;
+        
+        // Detailed edge analysis
+        var boundaryEdges = [];
+        var tol = 0.15;
+        for (var ei = 0; ei < holePoly.length; ei++) {
+            var a = holePoly[ei];
+            var b = holePoly[(ei + 1) % holePoly.length];
+            var raA = pointRadius(a), raB = pointRadius(b);
+            var dx = b[0]-a[0], dy = b[1]-a[1];
+            var len = Math.sqrt(dx*dx+dy*dy);
+            
+            if (len < tol) continue;
+            
+            var isBoundary = false;
+            var reason = '';
+            
+            // Circle chord detection
+            if ((Math.abs(raA - totalR) < tol && Math.abs(raB - totalR) < tol) ||
+                (Math.abs(raA - r_hole) < tol && Math.abs(raB - r_hole) < tol)) {
+                var mid = [(a[0]+b[0])/2, (a[1]+b[1])/2];
+                var raMid = pointRadius(mid);
+                if (raMid < Math.max(totalR, r_hole) - tol) {
+                    isBoundary = true;
+                    reason = 'circleChord';
+                }
+            }
+            
+            // Radial boundary detection
+            if (!isBoundary && splitStartAng != null) {
+                if (edgeIsOnRadialBoundary(a, b, splitStartAng, r_hole, totalR, tol) ||
+                    edgeIsOnRadialBoundary(a, b, splitEndAng, r_hole, totalR, tol)) {
+                    isBoundary = true;
+                    reason = 'radial';
+                }
+            }
+            
+            if (isBoundary) {
+                boundaryEdges.push({
+                    idx: ei,
+                    raA: raA.toFixed(1),
+                    raB: raB.toFixed(1),
+                    reason: reason,
+                    suppressed: skipFlags[ei]
+                });
+            }
+        }
+        
+        var unsuppressed = boundaryEdges.filter(function(e){return !e.suppressed;});
+        if (unsuppressed.length > 0) {
+            console.warn('  ⚠ Hole ' + i + ' (' + mountingHoles[i].shape + '): ' + unsuppressed.length + ' UNSUPPRESSED boundary edge(s)');
+            unsuppressed.forEach(function(e){
+                console.log('    Edge ' + e.idx + ' (' + e.reason + '): suppressed=' + e.suppressed);
+            });
+            allClean = false;
+        } else if (boundaryEdges.length > 0) {
+            console.log('  ✓ Hole ' + i + ' (' + mountingHoles[i].shape + '): ' + boundaryEdges.length + ' boundary edges ALL suppressed');
+        } else {
+            console.log('  ✓ Hole ' + i + ' (' + mountingHoles[i].shape + '): no boundary edges');
+        }
+    }
+    
+    // Generate STL and check for degenerate faces
+    var stlContent = generateSTL_Scanline();
+    var degenerateCount = (stlContent.match(/facet normal 0 0 0/g) || []).length;
+    if (degenerateCount > 0) {
+        console.warn('  ⚠ STL: ' + degenerateCount + ' degenerate facets');
+        allClean = false;
+    }
+    
+    console.log('RESULT: ' + (allClean ? '✓ CLEAN' : '✗ ORPHANS DETECTED'));
+    return allClean;
+}
+
+function testAllScenarios() {
+    console.log('\n========== TESTING ALL THREE EDGE CASES ==========\n');
+    var results = {};
+    results.A = testScenario('A');
+    results.B = testScenario('B');
+    results.C = testScenario('C');
+    
+    console.log('\n========== SUMMARY ==========');
+    console.log('Scenario A (3 holes, 60° rot, split 1/3):', results.A ? 'PASS' : 'FAIL');
+    console.log('Scenario B (110mm pos, 0° rot, split 1/3):', results.B ? 'PASS' : 'FAIL');
+    console.log('Scenario C (A_off 90°, split 1/6):', results.C ? 'PASS' : 'FAIL');
+    
+    return results;
+}
+
+// ============================================================
+// EXPORT VISUALIZATION & INSPECTION
+// ============================================================
+
+function analyzeExportedSVG() {
+    // Analyze the SVG currently in the page/textarea
+    var svgText = document.getElementById('svgSrc').value;
+    if (!svgText) {
+        console.error('No SVG source found');
+        return;
+    }
+    
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(svgText, 'image/svg+xml');
+    
+    var paths = doc.querySelectorAll('path');
+    var analysis = {
+        totalPaths: paths.length,
+        boundaryPaths: [],
+        slitPaths: [],
+        maskPaths: [],
+        shortPaths: []
+    };
+    
+    for (var i = 0; i < paths.length; i++) {
+        var p = paths[i];
+        var d = p.getAttribute('d') || '';
+        var stroke = p.getAttribute('stroke');
+        var fill = p.getAttribute('fill');
+        
+        var pathInfo = {
+            id: i,
+            pathLength: d.length,
+            stroke: stroke,
+            fill: fill,
+            data: d.substring(0, 100) + (d.length > 100 ? '...' : '')
+        };
+        
+        if (d.length < 150) {
+            analysis.shortPaths.push(pathInfo);
+        }
+        if (stroke && stroke !== 'none') {
+            analysis.slitPaths.push(pathInfo);
+        }
+        if (fill === 'black' || fill === '#000000') {
+            analysis.maskPaths.push(pathInfo);
+        }
+    }
+    
+    console.log('\n========== SVG EXPORT ANALYSIS ==========');
+    console.log('Total paths:', analysis.totalPaths);
+    console.log('Slit stroke paths:', analysis.slitPaths.length);
+    console.log('Mask fill paths:', analysis.maskPaths.length);
+    console.log('Short paths (<150 chars) - SUSPICIOUS:', analysis.shortPaths.length);
+    if (analysis.shortPaths.length > 0) {
+        console.warn('Suspicious short paths:');
+        analysis.shortPaths.forEach(function(p) {
+            console.log('  Path ' + p.id + ': ' + p.pathLength + ' chars - ' + p.data);
+        });
+    }
+    console.log('=========================================\n');
+    
+    return analysis;
+}
+
+function analyzeExportedSTL() {
+    // Analyze the STL currently being generated
+    var stlContent = generateSTL_Scanline();
+    
+    var lines = stlContent.split('\n');
+    var facets = [];
+    var facetCount = 0;
+    
+    for (var i = 0; i < lines.length; i++) {
+        if (lines[i].indexOf('facet normal') !== -1) {
+            var parts = lines[i].split(/\s+/);
+            var nx = parseFloat(parts[2]);
+            var ny = parseFloat(parts[3]);
+            var nz = parseFloat(parts[4]);
+            var mag = Math.sqrt(nx*nx + ny*ny + nz*nz);
+            
+            var type = 'unknown';
+            if (Math.abs(nz - 1) < 0.01) type = 'top';
+            else if (Math.abs(nz + 1) < 0.01) type = 'bottom';
+            else type = 'side';
+            
+            facets.push({
+                id: facetCount,
+                nx: nx, ny: ny, nz: nz,
+                mag: mag,
+                type: type,
+                isDegenerate: mag < 1e-10
+            });
+            facetCount++;
+        }
+    }
+    
+    var degen = facets.filter(function(f) { return f.isDegenerate; }).length;
+    var top = facets.filter(function(f) { return f.type === 'top'; }).length;
+    var bottom = facets.filter(function(f) { return f.type === 'bottom'; }).length;
+    var side = facets.filter(function(f) { return f.type === 'side'; }).length;
+    
+    console.log('\n========== STL EXPORT ANALYSIS ==========');
+    console.log('Total facets:', facets.length);
+    console.log('Top face facets:', top);
+    console.log('Bottom face facets:', bottom);
+    console.log('Side wall facets:', side);
+    console.log('Degenerate facets (normal=[0,0,0]):', degen);
+    
+    if (degen > 0) {
+        console.error('⚠ DEGENERATE FACETS DETECTED!');
+        facets.filter(function(f) { return f.isDegenerate; }).slice(0, 5).forEach(function(f) {
+            console.log('  Facet ' + f.id + ': normal=(' + f.nx.toFixed(5) + ', ' + f.ny.toFixed(5) + ', ' + f.nz.toFixed(5) + ')');
+        });
+    }
+    
+    if (Math.abs(top - bottom) > 2) {
+        console.warn('⚠ TOP/BOTTOM MISMATCH: ' + top + ' top vs ' + bottom + ' bottom (difference: ' + Math.abs(top-bottom) + ')');
+    } else {
+        console.log('✓ Top/bottom facet counts balanced');
+    }
+    
+    console.log('=========================================\n');
+    
+    return { facets: facets, summary: { total: facets.length, top: top, bottom: bottom, side: side, degenerate: degen } };
+}
+
+function fullExportComparison() {
+    console.log('\n\n╔═══════════════════════════════════════════════════╗');
+    console.log('║        FULL EXPORT COMPARISON ANALYSIS             ║');
+    console.log('╚═══════════════════════════════════════════════════╝\n');
+    
+    readUI();
+    drawMask();
+    
+    var svgAnalysis = analyzeExportedSVG();
+    var stlAnalysis = analyzeExportedSTL();
+    
+    console.log('VERDICT:');
+    var issues = [];
+    if (svgAnalysis.shortPaths.length > 0) {
+        issues.push('⚠ SVG has ' + svgAnalysis.shortPaths.length + ' suspicious short paths');
+    }
+    if (stlAnalysis.summary.degenerate > 0) {
+        issues.push('⚠ STL has ' + stlAnalysis.summary.degenerate + ' degenerate facets');
+    }
+    if (Math.abs(stlAnalysis.summary.top - stlAnalysis.summary.bottom) > 2) {
+        issues.push('⚠ STL top/bottom mismatch: ' + Math.abs(stlAnalysis.summary.top - stlAnalysis.summary.bottom) + ' difference');
+    }
+    
+    if (issues.length === 0) {
+        console.log('✓ NO ISSUES DETECTED - exports appear clean\n');
+    } else {
+        issues.forEach(function(issue) {
+            console.log(issue);
+        });
+        console.log('\n→ Use export_visualizer.html to inspect in detail');
+    }
+}
+
+function exportAndAnalyze(scenario) {
+    // Helper: set up scenario, export, and analyze
+    debugSetup(scenario);
+    console.log('\n>>> Exporting Scenario ' + scenario + ' and analyzing...');
+    fullExportComparison();
+    
+    // Provide export instructions
+    console.log('\n>>> To visually inspect:');
+    console.log('1. Click: document.getElementById("btnDownloadSVG").click()');
+    console.log('2. Click: document.getElementById("btnDownload3DScanline").click()');
+    console.log('3. Open: test/export_visualizer.html in this browser');
+    console.log('4. Load the downloaded files in the visualizer');
+    console.log('5. Click on red/suspicious edges/faces to identify them');
 }
 
 // ============================================================

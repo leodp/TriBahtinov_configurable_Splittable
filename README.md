@@ -1,4 +1,4 @@
-# TroBahtinov_configurable_Splittable
+# TriBahtinov_configurable_Splittable
 
 Configurable and splittable Tri-Bahtinov mask generator with integrated FFT focal-plane inspection, implemented as standalone HTML tools.
 
@@ -18,7 +18,7 @@ The project is intentionally framework-free: each tool is a single HTML file wit
 
 - `3Bahtinov_split_config.html`
 
-Release status: `v1.3`
+Release status: `v1.4`
 
 ### What it does
 
