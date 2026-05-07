@@ -991,6 +991,20 @@ function polygonToPathD(poly) {
     return d;
 }
 
+// Build a high-resolution circle path using line segments.
+// This is used for export compatibility with CAD tools that tessellate SVG arc
+// commands too coarsely. It keeps the visual ring definition consistent.
+function svgCirclePathHiRes(cx, cy, r, maxChordLen, minSegs, maxSegs) {
+    if (r <= 0) return '';
+    var segs = computeArcSegments(r, 2 * Math.PI, maxChordLen || 0.6, minSegs || 360, maxSegs || 2880);
+    var poly = [];
+    for (var i = 0; i < segs; i++) {
+        var a = (2 * Math.PI * i) / segs;
+        poly.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return polygonToPathD(poly);
+}
+
 // ============================================================
 // SVG PATH COMBINATION FOR BOOLEAN OPERATIONS
 // Creates a single unified path with proper winding for
@@ -1840,16 +1854,17 @@ function drawMask() {
     }
 
     // === RENDER FILLED MASK USING CIRCLES AND PATHS ===
-    // Outer mask circle (using arc-based circle path for precision)
-    var outerCircle = svgCirclePath(0, 0, totalR);
+    // Outer mask circle.
+    // Use high-resolution polyline path for robust fidelity in CAD importers.
+    var outerCircle = svgCirclePathHiRes(0, 0, totalR, 0.6, 480, 3200);
     svg.appendChild(createSvgElement('path', {
         d: outerCircle,
         fill: '#000000',
         stroke: 'none'
     }));
 
-    // Central hole as circle (cutout via fill-rule evenodd)
-    var centralHole = svgCirclePath(0, 0, r_hole);
+    // Central hole as high-resolution path to match outer ring fidelity in export.
+    var centralHole = svgCirclePathHiRes(0, 0, r_hole, 0.5, 240, 2400);
     svg.appendChild(createSvgElement('path', {
         d: centralHole,
         fill: '#FFFFFF',
