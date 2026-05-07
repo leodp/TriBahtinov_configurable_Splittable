@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.5] - 2026-05-07
+
+### Added
+
+- **Scale bar** below the mask preview showing the tube/mask diameter (screen only, not exported)
+- **Export info text** below Save SVG / Save STL buttons explaining how to use the exported files with FreeCAD
+- **Airy radius in micrometers** on FFT focal-plane image overlay (was in mm/inches)
+- Square mounting holes now render as actual squares in SVG and on screen (were always rendered as circles)
+- Both 3x and 4x mounting hole sets can now be enabled simultaneously
+
+### Changed
+
+- **Version bumped to 1.5**
+- SVG split export now uses an anti-sector white polygon instead of SVG `<clipPath>` / `<defs>`, making exported files compatible with all CAD tools (FreeCAD, Inkscape, etc.)
+- STL side walls now emitted directly from polygon edge lists instead of inferred boundary-edge extraction — eliminates open/missing lateral faces
+- Defocus control simplified: single signed number field replaces the direction dropdown. 0 = in focus, positive = front focus, negative = back focus
+- Save SVG filename: `3Bahtinov.svg`; Save STL filename: `3Bahtinov.stl`
+- Mask section no longer forces full viewport height; FFT divider aligns to actual content bottom
+- Mounting hole rotation now correctly applied for both 3x and 4x sets
+- Debug render mode ("Paths only") and all related dead code removed
+
+### Fixed
+
+- 4x mounting holes were invisible when enabled
+- Mounting hole rotation angle from UI was ignored
+- Split SVG export looked unsplit in CAD tools (clipPath not respected by importers)
+- STL exported with empty/missing lateral faces and manifold errors
+- Square shape option produced circles instead of squares
+
 ## [1.41] - 2026-05-06
 
 ### Added
