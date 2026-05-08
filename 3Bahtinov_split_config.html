@@ -420,6 +420,15 @@ body {
         <input type="text" id="thickness3D" value="3">
     </div>
 
+    <div class="param-group">
+        <label for="curveDecimation">Curves decimation for simpler models:</label>
+        <select id="curveDecimation">
+            <option value="1" selected>1x best</option>
+            <option value="2">2x</option>
+            <option value="4">4x worst</option>
+        </select>
+    </div>
+
     <div class="buttons">
         <button id="btnDownloadSVG">Save SVG</button>
         <button id="btnDownloadSTL_A">Save STL</button>
@@ -522,6 +531,7 @@ var params = {
     SplitStartAngle: -60, // Derived: start angle for split sector
     SplitEndAngle: 60,    // Derived: end angle for split sector
     Thickness3D: 2,     // 3D model thickness (mm) - kept for STL export
+    CurveDecimation: 1, // Curves decimation factor (1, 2, or 4)
     // 3x mounting holes
     MountingHoles3x: false,
     MountingHolesShape3x: 'round',
@@ -1991,6 +2001,7 @@ function readUI() {
     params.SectorsStem_th = parseFloat(document.getElementById('sectorBorder').value) * unitFactor;
     params.Rounding = parseFloat(document.getElementById('rounding').value);
     params.Thickness3D = parseFloat(document.getElementById('thickness3D').value) * unitFactor;
+    params.CurveDecimation = parseInt(document.getElementById('curveDecimation').value) || 1;
     // Split mode
     params.SplitMode = document.getElementById('splitMaskMode').value;
     params.Split = (params.SplitMode !== 'none');
@@ -2993,18 +3004,19 @@ function saveParams() {
         ['Focal Length (mm)', params.FL],
         ['Lens Diameter (mm)', params.Diam],
         ['Tube/Mask Diameter (mm)', params.TDiam],
-        ['Central Hole Radius (mm)', params.Rh * 2],
+        ['Central Hole Diameter (mm)', params.Rh * 2],
         ['Ring Border (mm)', params.Rth],
         ['Sector Border (mm)', params.SectorsStem_th],
         ['Bahtinov Factor', params.BahF],
         ['Bahtinov Angle (°)', params.As],
         ['Offset Angle (°)', params.A_off],
-        ['Order Factor', params.OF],
+        ['Use 3rd Order Spectrum', params.OF === 3 ? 'Yes' : 'No'],
         ['Slit/Stem Ratio', params.Sd_Sst_rat],
         ['Slits Rings Ratio', params.SlitsRatio],
         ['Rounding', params.Rounding],
         ['Split Mode', params.SplitMode],
         ['3D Thickness (mm)', params.Thickness3D],
+        ['Curve Decimation', params.CurveDecimation],
         ['3x Mounting Holes', params.MountingHoles3x ? 'Yes' : 'No'],
         ['3x Holes Shape', params.MountingHolesShape3x],
         ['3x Holes Position (mm)', params.MountingHolesPos3x],
@@ -3014,15 +3026,7 @@ function saveParams() {
         ['4x Holes Shape', params.MountingHolesShape4x],
         ['4x Holes Position (mm)', params.MountingHolesPos4x],
         ['4x Holes Diameter (mm)', params.MountingHolesDiam4x],
-        ['4x Holes Angle (°)', params.MountingHolesAngle4x],
-        ['FFT Wavelength Mode', fftState.wavelengthMode],
-        ['FFT Defocus (waves @ 530 nm)', document.getElementById('fftDefocusWaves').value],
-        ['FFT Grid Size', fftState.gridSize],
-        ['FFT Aperture Margin Factor', fftState.padFactor],
-        ['FFT Mask Resolution Boost', fftState.maskResMul],
-        ['FFT Intensity Mapping', fftState.toneMode],
-        ['FFT Display Gain', fftState.gain],
-        ['FFT Half-View Size', fftState.viewHalf]
+        ['4x Holes Angle (°)', params.MountingHolesAngle4x]
     ];
     
     var codaLines = [
@@ -3087,18 +3091,19 @@ function loadParams() {
                 ['Focal Length (mm)', 'focalLength', 'text', unitFactor],
                 ['Lens Diameter (mm)', 'lensDiam', 'text', unitFactor],
                 ['Tube/Mask Diameter (mm)', 'tubeDiam', 'text', unitFactor],
-                ['Central Hole Radius (mm)', 'centralHole', 'text', unitFactor * 2],
+                ['Central Hole Diameter (mm)', 'centralHole', 'text', unitFactor],
                 ['Ring Border (mm)', 'ringBorder', 'text', unitFactor],
                 ['Sector Border (mm)', 'sectorBorder', 'text', unitFactor],
                 ['Bahtinov Factor', 'bahtinovFactor', 'text', 1],
                 ['Bahtinov Angle (°)', 'bahtinovAngle', 'text', 1],
                 ['Offset Angle (°)', 'offsetAngle', 'text', 1],
-                ['Order Factor', 'thirdOrder', 'checkbox', 1],
+                ['Use 3rd Order Spectrum', 'thirdOrder', 'checkbox', 1],
                 ['Slit/Stem Ratio', 'slitStemRatio', 'text', 1],
                 ['Slits Rings Ratio', 'slitsRatio', 'text', 1],
                 ['Rounding', 'rounding', 'select', 1],
                 ['Split Mode', 'splitMaskMode', 'select', 1],
                 ['3D Thickness (mm)', 'thickness3D', 'text', unitFactor],
+                ['Curve Decimation', 'curveDecimation', 'select', 1],
                 ['3x Mounting Holes', 'mountingHoles3x', 'checkbox', 1],
                 ['3x Holes Shape', 'mountingHolesShape3x', 'select', 1],
                 ['3x Holes Position (mm)', 'mountingHolesPos3x', 'text', unitFactor],
@@ -3108,15 +3113,7 @@ function loadParams() {
                 ['4x Holes Shape', 'mountingHolesShape4x', 'select', 1],
                 ['4x Holes Position (mm)', 'mountingHolesPos4x', 'text', unitFactor],
                 ['4x Holes Diameter (mm)', 'mountingHolesDiam4x', 'text', unitFactor],
-                ['4x Holes Angle (°)', 'mountingHolesAngle4x', 'select', 1],
-                ['FFT Wavelength Mode', 'fftWavelengthMode', 'select', 1],
-                ['FFT Defocus (waves @ 530 nm)', 'fftDefocusWaves', 'number', 1],
-                ['FFT Grid Size', 'fftGridSize', 'select', 1],
-                ['FFT Aperture Margin Factor', 'fftPadFactor', 'number', 1],
-                ['FFT Mask Resolution Boost', 'fftMaskResMul', 'select', 1],
-                ['FFT Intensity Mapping', 'fftToneMode', 'select', 1],
-                ['FFT Display Gain', 'fftGain', 'number', 1],
-                ['FFT Half-View Size', 'fftViewHalf', 'number', 1]
+                ['4x Holes Angle (°)', 'mountingHolesAngle4x', 'select', 1]
             ];
             
             for (var i = 0; i < mapping.length; i++) {
@@ -3132,7 +3129,7 @@ function loadParams() {
                     var value = paramMap[paramName];
                     if (elemType === 'checkbox') {
                         elem.checked = (value === 'Yes' || value === 'true');
-                    } else if (elemType === 'select' || elemType === 'number') {
+                    } else if (elemType === 'select') {
                         elem.value = value;
                     } else {
                         elem.value = (parseFloat(value) * factor).toString();
