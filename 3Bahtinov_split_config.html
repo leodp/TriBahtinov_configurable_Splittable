@@ -36,9 +36,10 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 80%;
+    width: 90%;
     margin-top: 12px;
     flex-shrink: 0;
+    box-sizing: border-box;
 }
 #mask-scale-line {
     width: 100%;
@@ -3092,6 +3093,8 @@ function loadParams() {
                 ['Lens Diameter (mm)', 'lensDiam', 'text', unitFactor],
                 ['Tube/Mask Diameter (mm)', 'tubeDiam', 'text', unitFactor],
                 ['Central Hole Diameter (mm)', 'centralHole', 'text', unitFactor],
+                // Backward compatibility: support old 'Radius' label (will NOT be applied if already loaded from 'Diameter')
+                ['Central Hole Radius (mm)', 'centralHole', 'text', unitFactor],
                 ['Ring Border (mm)', 'ringBorder', 'text', unitFactor],
                 ['Sector Border (mm)', 'sectorBorder', 'text', unitFactor],
                 ['Bahtinov Factor', 'bahtinovFactor', 'text', 1],
@@ -3121,6 +3124,11 @@ function loadParams() {
                 var elemId = mapping[i][1];
                 var elemType = mapping[i][2];
                 var factor = mapping[i][3];
+                
+                // Skip if already loaded 'Central Hole Diameter' (don't load old 'Radius' format)
+                if (paramName === 'Central Hole Radius (mm)' && paramMap.hasOwnProperty('Central Hole Diameter (mm)')) {
+                    continue;
+                }
                 
                 if (paramMap.hasOwnProperty(paramName)) {
                     var elem = document.getElementById(elemId);
