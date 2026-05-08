@@ -421,15 +421,6 @@ body {
         <input type="text" id="thickness3D" value="3">
     </div>
 
-    <div class="param-group">
-        <label for="curveDecimation">Curves decimation for simpler models:</label>
-        <select id="curveDecimation">
-            <option value="1" selected>1x best</option>
-            <option value="2">2x</option>
-            <option value="4">4x worst</option>
-        </select>
-    </div>
-
     <div class="buttons">
         <button id="btnDownloadSVG">Save SVG</button>
         <button id="btnDownloadSTL_A">Save STL</button>
@@ -532,7 +523,6 @@ var params = {
     SplitStartAngle: -60, // Derived: start angle for split sector
     SplitEndAngle: 60,    // Derived: end angle for split sector
     Thickness3D: 2,     // 3D model thickness (mm) - kept for STL export
-    CurveDecimation: 1, // Curves decimation factor (1, 2, or 4)
     // 3x mounting holes
     MountingHoles3x: false,
     MountingHolesShape3x: 'round',
@@ -2002,7 +1992,6 @@ function readUI() {
     params.SectorsStem_th = parseFloat(document.getElementById('sectorBorder').value) * unitFactor;
     params.Rounding = parseFloat(document.getElementById('rounding').value);
     params.Thickness3D = parseFloat(document.getElementById('thickness3D').value) * unitFactor;
-    params.CurveDecimation = parseInt(document.getElementById('curveDecimation').value) || 1;
     // Split mode
     params.SplitMode = document.getElementById('splitMaskMode').value;
     params.Split = (params.SplitMode !== 'none');
@@ -3017,7 +3006,6 @@ function saveParams() {
         ['Rounding', params.Rounding],
         ['Split Mode', params.SplitMode],
         ['3D Thickness (mm)', params.Thickness3D],
-        ['Curve Decimation', params.CurveDecimation],
         ['3x Mounting Holes', params.MountingHoles3x ? 'Yes' : 'No'],
         ['3x Holes Shape', params.MountingHolesShape3x],
         ['3x Holes Position (mm)', params.MountingHolesPos3x],
@@ -3106,7 +3094,6 @@ function loadParams() {
                 ['Rounding', 'rounding', 'select', 1],
                 ['Split Mode', 'splitMaskMode', 'select', 1],
                 ['3D Thickness (mm)', 'thickness3D', 'text', unitFactor],
-                ['Curve Decimation', 'curveDecimation', 'select', 1],
                 ['3x Mounting Holes', 'mountingHoles3x', 'checkbox', 1],
                 ['3x Holes Shape', 'mountingHolesShape3x', 'select', 1],
                 ['3x Holes Position (mm)', 'mountingHolesPos3x', 'text', unitFactor],

@@ -32,7 +32,7 @@ Release status: `v1.6`
 - Supports FFT defocus simulation: enter a signed wave count (positive = front focus, negative = back focus, 0 = in focus) referenced to 530 nm green
 - Exports STL with side walls emitted directly from polygon boundaries for improved manifold quality
 - Scale bar below mask preview shows the tube/mask diameter on screen
-- **Parameter import/export**: Save all mask and FFT UI parameters to CSV file and load them back for configuration preservation
+- **Parameter import/export**: Save all UI parameters to CSV file and load them back for configuration preservation
 - **Defocus sweep export**: Batch-export FFT focal-plane PNG images at multiple defocus values for creating focus sequences
 
 ### Implementation overview
