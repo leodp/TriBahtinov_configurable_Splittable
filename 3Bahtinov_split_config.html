@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<!-- TroBahtinov_configurable_Splittable - Release v1.5 | License: GPL-3.0-or-later -->
+<!-- TroBahtinov_configurable_Splittable - Release v1.6 | License: GPL-3.0-or-later -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tri Bahtinov Mask, splittable, configurable — v1.5</title>
+<title>Tri Bahtinov Mask, splittable, configurable — v1.6</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -110,10 +110,12 @@ body {
 .buttons {
     margin-top: 16px;
     margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
 }
 .buttons button {
     padding: 6px 14px;
-    margin-right: 8px;
     cursor: pointer;
 }
 #svg-source-title {
@@ -265,8 +267,9 @@ body {
 
 <!-- RIGHT: Controls -->
 <div id="controls-panel">
-    <h2>Tri Bahtinov Mask, splittable, configurable — v1.5</h2>
-    <p class="desc">Tri-Bahtinov mask generator, based on Satakagi implementation. The mask can be split, to allow bigger masks to be 3D printed. Slits can be rotated of an offset angle. Programmed by Leonardo Della Pietra leodp@yahoo.com</p>
+    <h2>Tri Bahtinov Mask, splittable, configurable — v1.6</h2>
+    <p class="desc">Tri-Bahtinov mask generator, based on 
+	<a href="https://satakagi.github.io/tribahtinovWebApps/Tri-Bahtinov_symmetric.html">Satoru Takagi</a> implementation. The mask can be split, to allow bigger masks to be 3D printed at home. Slits can be rotated of an extra offset angle. Programmed by Leonardo Della Pietra leodp@yahoo.com</p>
 
     <div class="section-title">Telescope parameters &amp; units</div>
 
@@ -410,7 +413,7 @@ body {
         </select>
     </div>
 
-    <div class="section-title">Export</div>
+    <div class="section-title">File Operations</div>
 
     <div class="param-group">
         <label for="thickness3D">3D thickness [<span class="unit-length">mm</span>]:</label>
@@ -420,8 +423,10 @@ body {
     <div class="buttons">
         <button id="btnDownloadSVG">Save SVG</button>
         <button id="btnDownloadSTL_A">Save STL</button>
+        <button id="btnSaveParams">Save Params</button>
+        <button id="btnLoadParams">Load Params</button>
     </div>
-    <p id="export-info">The SVG 2D vector file contains all the paths needed to build the mask. For further info please refer to external resources; a possible search could be done with the text &ldquo;Turning an SVG into a 3D Printed Object with FreeCAD&rdquo;.<br><br>The STL 3D mesh may have some issues like open faces and free-standing faces without internal volume. Try to clean them in a SW, like for example FreeCAD. At best you can select the tool &ldquo;MEESH&rdquo; and export them (again) as a mesh. If you&rsquo;re lucky it works. Otherwise you may want to try the tool &ldquo;Close hole&rdquo;. YMMV</p>
+    <p id="export-info">The SVG 2D vector file contains all the paths needed to build the mask. For further info please refer to external resources; a possible search could be done with the text &ldquo;Turning an SVG into a 3D Printed Object with FreeCAD&rdquo;.<br><br>The STL 3D mesh may have some issues like open faces and free-standing faces not enclosing the mask internal volume. Try to clean them in a SW, like for example <a href="https://www.freecad.org/">FreeCAD</a>. At best you can select the &ldquo;Mesh&rdquo; workbench and export them (again) as a mesh. If you&rsquo;re lucky it works. Otherwise you may want to try the mesh tool &ldquo;Fill holes&rdquo;, increasing the max number of edges to 4. YMMV</p>
 
     <!-- Hidden: SVG source kept for internal use by download and FFT functions -->
     <textarea id="svgSrc" readonly></textarea>
@@ -470,6 +475,9 @@ body {
 
         <div class="fft-field"><label for="fftWavelengthMode">Wavelength preset</label><select id="fftWavelengthMode"><option value="red">Red</option><option value="blue">Blue</option><option value="green" selected>Green</option><option value="rgb">RGB</option></select></div>
         <div class="fft-field"><label for="fftDefocusWaves">Defocus [waves @ 530 nm] (0=in focus, +front, &minus;back)</label><input id="fftDefocusWaves" type="number" step="0.05" value="0"></div>
+        <div class="fft-field"><label for="fftDefocusSweepRange">Defocus sweep range [+/&minus; wavel.]</label><input id="fftDefocusSweepRange" type="number" step="1" min="0" value="10"></div>
+        <div class="fft-field"><label for="fftDefocusSweepSteps">Total defocus steps</label><input id="fftDefocusSweepSteps" type="number" step="1" min="1" value="11"></div>
+        <div class="fft-field"><label>&nbsp;</label><button id="btnExportDefocusPNGs">Export Defocus PNGs</button></div>
         <div class="fft-field"><label for="fftGridSize">FFT grid size (pow2)</label><select id="fftGridSize"><option>512</option><option>1024</option><option selected>2048</option><option>4096</option></select></div>
         <div class="fft-field"><label for="fftPadFactor">Aperture margin factor</label><input id="fftPadFactor" type="number" step="0.01" value="1"></div>
         <div class="fft-field"><label for="fftMaskResMul">Mask resolution boost</label><select id="fftMaskResMul"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select></div>
@@ -2051,6 +2059,9 @@ function initUI() {
     // Download buttons
     document.getElementById('btnDownloadSVG').addEventListener('click', downloadSVG);
     document.getElementById('btnDownloadSTL_A').addEventListener('click', downloadSTL_A);
+    document.getElementById('btnSaveParams').addEventListener('click', saveParams);
+    document.getElementById('btnLoadParams').addEventListener('click', loadParams);
+    document.getElementById('btnExportDefocusPNGs').addEventListener('click', exportDefocusPNGs);
 }
 
 var previousUnit = 'mm';
@@ -2969,6 +2980,253 @@ function downloadSTL_A() {
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = '3Bahtinov.stl'; a.click();
     URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// SAVE PARAMS: Export all parameters to CSV file
+// ============================================================
+function saveParams() {
+    readUI();
+    
+    var paramsList = [
+        ['Parameter Name:', 'Parameter Value'],
+        ['Focal Length (mm)', params.FL],
+        ['Lens Diameter (mm)', params.Diam],
+        ['Tube/Mask Diameter (mm)', params.TDiam],
+        ['Central Hole Radius (mm)', params.Rh * 2],
+        ['Ring Border (mm)', params.Rth],
+        ['Sector Border (mm)', params.SectorsStem_th],
+        ['Bahtinov Factor', params.BahF],
+        ['Bahtinov Angle (°)', params.As],
+        ['Offset Angle (°)', params.A_off],
+        ['Order Factor', params.OF],
+        ['Slit/Stem Ratio', params.Sd_Sst_rat],
+        ['Slits Rings Ratio', params.SlitsRatio],
+        ['Rounding', params.Rounding],
+        ['Split Mode', params.SplitMode],
+        ['3D Thickness (mm)', params.Thickness3D],
+        ['3x Mounting Holes', params.MountingHoles3x ? 'Yes' : 'No'],
+        ['3x Holes Shape', params.MountingHolesShape3x],
+        ['3x Holes Position (mm)', params.MountingHolesPos3x],
+        ['3x Holes Diameter (mm)', params.MountingHolesDiam3x],
+        ['3x Holes Angle (°)', params.MountingHolesAngle3x],
+        ['4x Mounting Holes', params.MountingHoles4x ? 'Yes' : 'No'],
+        ['4x Holes Shape', params.MountingHolesShape4x],
+        ['4x Holes Position (mm)', params.MountingHolesPos4x],
+        ['4x Holes Diameter (mm)', params.MountingHolesDiam4x],
+        ['4x Holes Angle (°)', params.MountingHolesAngle4x],
+        ['FFT Wavelength Mode', fftState.wavelengthMode],
+        ['FFT Defocus (waves @ 530 nm)', document.getElementById('fftDefocusWaves').value],
+        ['FFT Grid Size', fftState.gridSize],
+        ['FFT Aperture Margin Factor', fftState.padFactor],
+        ['FFT Mask Resolution Boost', fftState.maskResMul],
+        ['FFT Intensity Mapping', fftState.toneMode],
+        ['FFT Display Gain', fftState.gain],
+        ['FFT Half-View Size', fftState.viewHalf]
+    ];
+    
+    var codaLines = [
+        '#'.repeat(80),
+        '# GitHub Repository: https://github.com/leodp/TriBahtinov_split_config',
+        '# This file contains parameters exported from the Tri Bahtinov Mask configurator.',
+        '# The Tri Bahtinov Mask is a focusing aid tool used in astronomy for precise focus adjustment.',
+        '# This tool generates configurable masks that can be 3D printed for telescope use.',
+        '# Use the Load Params button to import these values back into the configurator.',
+        '#'.repeat(80)
+    ];
+    
+    var csvContent = paramsList.map(function(row) {
+        return row.map(function(cell) {
+            var str = String(cell);
+            return str.includes('\t') || str.includes('\n') ? '"' + str.replace(/"/g, '""') + '"' : str;
+        }).join('\t');
+    }).join('\n') + '\n' + codaLines.join('\n');
+    
+    var blob = new Blob([csvContent], { type: 'text/plain' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '3Bahtinov_params.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// LOAD PARAMS: Import parameters from CSV file
+// ============================================================
+function loadParams() {
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.csv,.txt';
+    fileInput.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            var content = event.target.result;
+            var lines = content.split('\n');
+            var paramMap = {};
+            
+            // Parse the CSV, ignoring coda lines (starting with #)
+            for (var i = 1; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (line.startsWith('#') || !line) continue;
+                
+                var parts = line.split('\t');
+                if (parts.length >= 2) {
+                    var name = parts[0].trim();
+                    var value = parts[1].trim();
+                    paramMap[name] = value;
+                }
+            }
+            
+            // Map loaded values to UI elements
+            var unitFactor = (document.getElementById('units').value === 'inches') ? 1/25.4 : 1;
+            
+            var mapping = [
+                ['Focal Length (mm)', 'focalLength', 'text', unitFactor],
+                ['Lens Diameter (mm)', 'lensDiam', 'text', unitFactor],
+                ['Tube/Mask Diameter (mm)', 'tubeDiam', 'text', unitFactor],
+                ['Central Hole Radius (mm)', 'centralHole', 'text', unitFactor * 2],
+                ['Ring Border (mm)', 'ringBorder', 'text', unitFactor],
+                ['Sector Border (mm)', 'sectorBorder', 'text', unitFactor],
+                ['Bahtinov Factor', 'bahtinovFactor', 'text', 1],
+                ['Bahtinov Angle (°)', 'bahtinovAngle', 'text', 1],
+                ['Offset Angle (°)', 'offsetAngle', 'text', 1],
+                ['Order Factor', 'thirdOrder', 'checkbox', 1],
+                ['Slit/Stem Ratio', 'slitStemRatio', 'text', 1],
+                ['Slits Rings Ratio', 'slitsRatio', 'text', 1],
+                ['Rounding', 'rounding', 'select', 1],
+                ['Split Mode', 'splitMaskMode', 'select', 1],
+                ['3D Thickness (mm)', 'thickness3D', 'text', unitFactor],
+                ['3x Mounting Holes', 'mountingHoles3x', 'checkbox', 1],
+                ['3x Holes Shape', 'mountingHolesShape3x', 'select', 1],
+                ['3x Holes Position (mm)', 'mountingHolesPos3x', 'text', unitFactor],
+                ['3x Holes Diameter (mm)', 'mountingHolesDiam3x', 'text', unitFactor],
+                ['3x Holes Angle (°)', 'mountingHolesAngle3x', 'select', 1],
+                ['4x Mounting Holes', 'mountingHoles4x', 'checkbox', 1],
+                ['4x Holes Shape', 'mountingHolesShape4x', 'select', 1],
+                ['4x Holes Position (mm)', 'mountingHolesPos4x', 'text', unitFactor],
+                ['4x Holes Diameter (mm)', 'mountingHolesDiam4x', 'text', unitFactor],
+                ['4x Holes Angle (°)', 'mountingHolesAngle4x', 'select', 1],
+                ['FFT Wavelength Mode', 'fftWavelengthMode', 'select', 1],
+                ['FFT Defocus (waves @ 530 nm)', 'fftDefocusWaves', 'number', 1],
+                ['FFT Grid Size', 'fftGridSize', 'select', 1],
+                ['FFT Aperture Margin Factor', 'fftPadFactor', 'number', 1],
+                ['FFT Mask Resolution Boost', 'fftMaskResMul', 'select', 1],
+                ['FFT Intensity Mapping', 'fftToneMode', 'select', 1],
+                ['FFT Display Gain', 'fftGain', 'number', 1],
+                ['FFT Half-View Size', 'fftViewHalf', 'number', 1]
+            ];
+            
+            for (var i = 0; i < mapping.length; i++) {
+                var paramName = mapping[i][0];
+                var elemId = mapping[i][1];
+                var elemType = mapping[i][2];
+                var factor = mapping[i][3];
+                
+                if (paramMap.hasOwnProperty(paramName)) {
+                    var elem = document.getElementById(elemId);
+                    if (!elem) continue;
+                    
+                    var value = paramMap[paramName];
+                    if (elemType === 'checkbox') {
+                        elem.checked = (value === 'Yes' || value === 'true');
+                    } else if (elemType === 'select' || elemType === 'number') {
+                        elem.value = value;
+                    } else {
+                        elem.value = (parseFloat(value) * factor).toString();
+                    }
+                }
+            }
+            
+            // Call onParamChange to update the mask
+            onParamChange();
+        };
+        reader.readAsText(file);
+    };
+    fileInput.click();
+}
+
+// ============================================================
+// EXPORT DEFOCUS PNGs: Export series of PNGs with defocus sweep
+// ============================================================
+async function exportDefocusPNGs() {
+    readUI();
+    
+    var sweepRange = parseFloat(document.getElementById('fftDefocusSweepRange').value);
+    var sweepSteps = parseInt(document.getElementById('fftDefocusSweepSteps').value);
+    
+    if (sweepSteps < 1) {
+        alert('Total defocus steps must be at least 1');
+        return;
+    }
+    if (sweepRange < 0) {
+        alert('Defocus sweep range must be non-negative');
+        return;
+    }
+    
+    // First, ask for filename prefix
+    var filenamePrefix = prompt('Enter filename prefix (default: 3Bahtinov_DefocusSweep_):', '3Bahtinov_DefocusSweep_');
+    if (filenamePrefix === null) return; // User cancelled
+    
+    // Ensure the prefix ends with underscore (remove trailing number pattern if present)
+    filenamePrefix = filenamePrefix.replace(/_[0-9]{3}$/, '');
+    if (!filenamePrefix.endsWith('_')) {
+        filenamePrefix += '_';
+    }
+    
+    // Calculate defocus values
+    var defocusValues = [];
+    if (sweepSteps === 1) {
+        defocusValues.push(0);
+    } else {
+        for (var i = 0; i < sweepSteps; i++) {
+            var t = i / (sweepSteps - 1);
+            var defocusValue = -sweepRange + t * 2 * sweepRange;
+            defocusValues.push(defocusValue);
+        }
+    }
+    
+    // Save current defocus value
+    var originalDefocus = parseFloat(document.getElementById('fftDefocusWaves').value);
+    
+    // Export each PNG
+    try {
+        for (var exportCount = 0; exportCount < defocusValues.length; exportCount++) {
+            // Set defocus value
+            var defocus = defocusValues[exportCount];
+            document.getElementById('fftDefocusWaves').value = defocus.toFixed(2);
+            
+            // Compute FFT
+            await computeFFTSection();
+            
+            // Generate filename with 3-digit counter
+            var counterStr = String(exportCount).padStart(3, '0');
+            var filename = filenamePrefix + counterStr + '.png';
+            
+            // Download canvas as PNG
+            var canvas = document.getElementById('fftFiCanvas');
+            await new Promise(function(resolve) {
+                canvas.toBlob(function(blob) {
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    
+                    setTimeout(resolve, 100); // Small delay before next iteration
+                }, 'image/png');
+            });
+        }
+        
+        // Restore original defocus
+        document.getElementById('fftDefocusWaves').value = originalDefocus;
+        alert('Successfully exported ' + defocusValues.length + ' PNG(s)');
+    } catch (err) {
+        alert('Error during export: ' + err.message);
+        document.getElementById('fftDefocusWaves').value = originalDefocus;
+    }
 }
 
 // ============================================================

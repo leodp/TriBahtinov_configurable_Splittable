@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.6] - 2026-05-08
+
+### Added
+
+- **Save Params button** (9a): exports all mask and FFT UI parameters to a tab-delimited CSV file named `3Bahtinov_params.csv`, including metadata and GitHub repository link
+- **Load Params button** (9a): imports previously saved parameter files, restoring all mask and FFT settings to the UI. Non-present parameters retain current values
+- **Defocus sweep controls** (9b) in FFT section:
+  - `Defocus sweep range [+/− wavel.]` field (default: 10 waves)
+  - `Total defocus steps` field (default: 11 steps)
+  - `Export Defocus PNGs` button to batch-export FFT focal-plane images at multiple defocus values
+- **Export Defocus PNGs feature** (9b): generates a series of PNG files named `3Bahtinov_DefocusSweep_XXX.png` (XXX = 3-digit counter), one for each step in the sweep range
+
+### Changed
+
+- **Version bumped to 1.6**
+- Save SVG / Save STL / Save Params / Load Params buttons now use equal-width 2-column grid layout
+- Button styling updated for better visual balance and alignment
+
+### Note
+
+- Curves decimation removed: SVG export maintains best resolution at all times. Simplification should be done in external CAD software (e.g., FreeCAD) where imported SVG files can be processed with dedicated tools
+
 ## [1.5] - 2026-05-07
 
 ### Added

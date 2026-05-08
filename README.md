@@ -18,7 +18,7 @@ The project is intentionally framework-free: each tool is a single HTML file wit
 
 - `3Bahtinov_split_config.html`
 
-Release status: `v1.5`
+Release status: `v1.6`
 
 ### What it does
 
@@ -32,6 +32,8 @@ Release status: `v1.5`
 - Supports FFT defocus simulation: enter a signed wave count (positive = front focus, negative = back focus, 0 = in focus) referenced to 530 nm green
 - Exports STL with side walls emitted directly from polygon boundaries for improved manifold quality
 - Scale bar below mask preview shows the tube/mask diameter on screen
+- **Parameter import/export**: Save all mask and FFT UI parameters to CSV file and load them back for configuration preservation
+- **Defocus sweep export**: Batch-export FFT focal-plane PNG images at multiple defocus values for creating focus sequences
 
 ### Implementation overview
 
